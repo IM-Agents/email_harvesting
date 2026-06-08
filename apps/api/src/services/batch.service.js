@@ -2,7 +2,8 @@ const fs = require("fs")
 const path = require("path")
 const { db } = require("../db/knex")
 const { parseSpreadsheet } = require("./fileParser.service")
-const { processBatchDomains } = require("./worker.service")
+const { enqueueBatchProcessing } = require("../queue/domainQueue")
+const { moveUploadToStorage } = require("./storage.service")
 
 const UPLOAD_DIR = path.join(__dirname, "../../uploads")
 
@@ -15,9 +16,9 @@ const ensureUploadDir = () => {
 const createBatchFromUpload = async (userId, file) => {
   ensureUploadDir()
   const storageKey = `${Date.now()}-${file.originalname}`
-  const dest = path.join(UPLOAD_DIR, storageKey)
-  fs.renameSync(file.path, dest)
+  await moveUploadToStorage(file.path, storageKey)
 
+  const dest = path.join(UPLOAD_DIR, storageKey)
   const parsed = parseSpreadsheet(dest, file.originalname)
 
   const [batchId] = await db("batches").insert({
@@ -168,8 +169,8 @@ const updateBatchStatus = async (batchId, userId, status) => {
   await db("batches").where({ id: batchId }).update(updates)
 
   if (action.to === "processing") {
-    processBatchDomains(batchId).catch((err) => {
-      console.error(`Batch ${batchId} processing error:`, err.message)
+    enqueueBatchProcessing(batchId).catch((err) => {
+      console.error(`Batch ${batchId} enqueue error:`, err.message)
     })
   }
 

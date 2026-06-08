@@ -38,8 +38,12 @@ const envSchema = Joi.object({
   REDIS_URL: Joi.string().uri().allow("").optional(),
   S3_ENDPOINT: Joi.string().allow("").optional(),
   S3_BUCKET: Joi.string().allow("").optional(),
+  S3_REGION: Joi.string().default("us-east-1"),
   S3_ACCESS_KEY_ID: Joi.string().allow("").optional(),
   S3_SECRET_ACCESS_KEY: Joi.string().allow("").optional(),
+
+  CRAWLER_PYTHON: Joi.string().default("python"),
+  CRAWLER_SERVICE_URL: Joi.string().uri().allow("").optional(),
 
   JWT_SECRET: Joi.string().min(16).allow("").optional(),
   WORKER_COUNT: Joi.number().default(10),

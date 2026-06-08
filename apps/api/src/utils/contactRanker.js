@@ -22,7 +22,7 @@ const selectTopContacts = (contacts, minCount = 2) => {
     if (a.rank_score !== b.rank_score) return a.rank_score - b.rank_score
     return new Date(a.discovered_at) - new Date(b.discovered_at)
   })
-  return sorted.slice(0, Math.max(minCount, sorted.length > 0 ? Math.min(minCount, sorted.length) : 0))
+  return sorted.slice(0, Math.min(minCount, sorted.length))
 }
 
 module.exports = { rankContact, selectTopContacts, TITLE_PRIORITY }

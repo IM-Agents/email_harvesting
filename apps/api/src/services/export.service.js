@@ -1,16 +1,8 @@
-const fs = require("fs")
 const path = require("path")
 const XLSX = require("xlsx")
 const { db } = require("../db/knex")
 const { UPLOAD_DIR } = require("./batch.service")
-
-const EXPORT_DIR = path.join(UPLOAD_DIR, "exports")
-
-const ensureExportDir = () => {
-  if (!fs.existsSync(EXPORT_DIR)) {
-    fs.mkdirSync(EXPORT_DIR, { recursive: true })
-  }
-}
+const { putObject, LOCAL_ROOT } = require("./storage.service")
 
 const getExportRows = async (batchId) => {
   return db("contacts as c")
@@ -33,13 +25,12 @@ const getExportRows = async (batchId) => {
 }
 
 const generateExportFile = async (exportId, batchId, format) => {
-  ensureExportDir()
   const rows = await getExportRows(batchId)
 
   const fileName = `batch-${batchId}-export.${format}`
   const storageKey = path.join("exports", fileName)
-  const filePath = path.join(UPLOAD_DIR, storageKey)
 
+  let buffer
   if (format === "csv") {
     const headers = Object.keys(rows[0] || {
       store_url: "",
@@ -56,13 +47,15 @@ const generateExportFile = async (exportId, batchId, format) => {
     for (const row of rows) {
       lines.push(headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(","))
     }
-    fs.writeFileSync(filePath, lines.join("\n"), "utf8")
+    buffer = Buffer.from(lines.join("\n"), "utf8")
   } else {
     const worksheet = XLSX.utils.json_to_sheet(rows)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "Contacts")
-    XLSX.writeFile(workbook, filePath)
+    buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })
   }
+
+  await putObject(storageKey, buffer)
 
   await db("exports").where({ id: exportId }).update({
     status: "completed",
@@ -129,7 +122,7 @@ const getExportDownloadPath = async (exportId, userId) => {
 
   const storageKey = await db("exports").select("storage_key").where({ id: exportId }).first()
   return {
-    path: path.join(UPLOAD_DIR, storageKey.storage_key),
+    path: path.join(LOCAL_ROOT, storageKey.storage_key),
     fileName: row.file_name,
   }
 }

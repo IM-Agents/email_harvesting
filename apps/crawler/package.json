@@ -1,0 +1,14 @@
+{
+  "name": "crawler",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "python -m uvicorn server:app --reload --host 127.0.0.1 --port 5001",
+    "start": "python -m uvicorn server:app --host 127.0.0.1 --port 5001",
+    "crawl": "python crawl_domain.py",
+    "lint": "echo \"lint: not configured\"",
+    "test": "python -m pytest -q",
+    "build": "echo \"crawler: no build step\"",
+    "clean": "echo \"crawler: clean noop\""
+  }
+}

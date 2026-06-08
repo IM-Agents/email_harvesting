@@ -6,7 +6,13 @@ export const ContactsPage = () => {
   const [batches, setBatches] = useState([])
   const [batchId, setBatchId] = useState("")
   const [contacts, setContacts] = useState([])
-  const [filters, setFilters] = useState({ domain: "", source: "", has_email: "" })
+  const [filters, setFilters] = useState({
+    domain: "",
+    source: "",
+    has_email: "",
+    priority_level: "",
+    job_title: "",
+  })
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -65,6 +71,24 @@ export const ContactsPage = () => {
           />
         </div>
         <div>
+          <label htmlFor="source-filter" className="block text-sm font-medium text-slate-700">
+            Source
+          </label>
+          <select
+            id="source-filter"
+            value={filters.source}
+            onChange={(e) => setFilters((f) => ({ ...f, source: e.target.value }))}
+            className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">All</option>
+            <option value="SNOV_PERSONAL">Snov Personal</option>
+            <option value="SNOV_EMAILS">Snov Emails</option>
+            <option value="APOLLO">Apollo</option>
+            <option value="LINKEDIN">LinkedIn</option>
+            <option value="DOMAIN_CONTACT">Website</option>
+          </select>
+        </div>
+        <div>
           <label htmlFor="has-email" className="block text-sm font-medium text-slate-700">
             Has email
           </label>
@@ -78,6 +102,37 @@ export const ContactsPage = () => {
             <option value="true">Yes</option>
             <option value="false">No</option>
           </select>
+        </div>
+        <div>
+          <label htmlFor="priority-filter" className="block text-sm font-medium text-slate-700">
+            Priority
+          </label>
+          <select
+            id="priority-filter"
+            value={filters.priority_level}
+            onChange={(e) => setFilters((f) => ({ ...f, priority_level: e.target.value }))}
+            className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">All</option>
+            {[1, 2, 3, 4, 5, 6].map((level) => (
+              <option key={level} value={String(level)}>
+                Level {level}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="job-title-filter" className="block text-sm font-medium text-slate-700">
+            Job title
+          </label>
+          <input
+            id="job-title-filter"
+            type="text"
+            value={filters.job_title}
+            onChange={(e) => setFilters((f) => ({ ...f, job_title: e.target.value }))}
+            className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            placeholder="e.g. Marketing"
+          />
         </div>
       </div>
 

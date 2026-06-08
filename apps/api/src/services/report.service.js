@@ -27,6 +27,23 @@ const getBatchReport = async (batchId, userId) => {
     .andWhere("priority_level", "<=", 2)
     .count({ count: "*" })
 
+  const timingRows = await db("domains")
+    .select("processing_started_at", "processing_completed_at")
+    .where({ batch_id: batchId })
+    .whereNotNull("processing_started_at")
+    .whereNotNull("processing_completed_at")
+
+  let totalSeconds = 0
+  let timedCount = 0
+  for (const row of timingRows) {
+    const start = new Date(row.processing_started_at).getTime()
+    const end = new Date(row.processing_completed_at).getTime()
+    if (end > start) {
+      totalSeconds += (end - start) / 1000
+      timedCount += 1
+    }
+  }
+
   const validDomains = batch.valid_domains || 0
   const contactsFound = batch.contacts_found || 0
   const processed = batch.processed_domains || 0
@@ -44,7 +61,8 @@ const getBatchReport = async (batchId, userId) => {
     executive_contact_rate: validDomains
       ? Math.round((Number(executiveCount[0].count) / validDomains) * 100) / 100
       : 0,
-    average_processing_time_seconds: processed > 0 ? 45 : 0,
+    average_processing_time_seconds:
+      timedCount > 0 ? Math.round(totalSeconds / timedCount) : 0,
     domain_status_breakdown: domainStats,
   }
 }

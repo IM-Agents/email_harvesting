@@ -8,6 +8,7 @@ node_modules/
 
 # Uploads and exports
 apps/api/uploads/
+apps/api/.browser-sessions/
 
 # Build outputs
 dist/

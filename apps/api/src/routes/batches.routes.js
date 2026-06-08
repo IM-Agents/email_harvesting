@@ -15,7 +15,7 @@ const {
 } = require("../services/batch.service")
 const { listBatchContacts } = require("../services/contact.service")
 const { createExport } = require("../services/export.service")
-const { getBatchReport } = require("../services/report.service")
+const { getBatchReport, getAuditLogs } = require("../services/report.service")
 
 const upload = multer({
   dest: path.join(UPLOAD_DIR, "tmp"),
@@ -138,6 +138,18 @@ batchesRouter.get(
   asyncHandler(async (req, res) => {
     try {
       const data = await getBatchReport(Number(req.params.batchId), req.user.id)
+      return success(res, data)
+    } catch (err) {
+      return error(res, err.code || "ERROR", err.message, err.status || 500)
+    }
+  })
+)
+
+batchesRouter.get(
+  "/:batchId/audit-logs",
+  asyncHandler(async (req, res) => {
+    try {
+      const data = await getAuditLogs(Number(req.params.batchId), req.user.id, req.query)
       return success(res, data)
     } catch (err) {
       return error(res, err.code || "ERROR", err.message, err.status || 500)

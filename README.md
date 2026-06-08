@@ -31,8 +31,11 @@ Full product documentation: [`docs/README.md`](./docs/README.md)
 ```bash
 cp .env.example .env
 npm install
+pip install -r apps/crawler/requirements.txt
 npm run db:init --workspace=api
 ```
+
+Set harvesting credentials in `.env` (`SNOV_*`, `APOLLO_*`, `LINKEDIN_*`) before running batch processing. Optional: `REDIS_URL` for BullMQ queue, `S3_*` for object storage, `CRAWLER_SERVICE_URL` for HTTP crawler mode.
 
 **Default admin:** `admin@emailharvest.local` / `admin123`
 
@@ -66,10 +69,10 @@ Public: `https://imagent.identixweb.com/qa/email_harvesting/api/health`
 | 7 | Register env vars in `.env` + `.env.example` | Done |
 | 8 | Page-wise test cases in `test/` | Done |
 | 9 | Preview verification + code review | Done |
-| 10 | Playwright Snov/Apollo/LinkedIn workers | Phase 2 |
-| 11 | Python website crawler service | Phase 2 |
-| 12 | Redis + BullMQ queue | Phase 2 |
-| 13 | S3 file storage integration | Phase 2 |
+| 10 | Playwright Snov/Apollo/LinkedIn workers | Done |
+| 11 | Python website crawler service | Done |
+| 12 | Redis + BullMQ queue | Done (optional `REDIS_URL`; in-process fallback) |
+| 13 | S3 file storage integration | Done (optional `S3_*`; local disk fallback) |
 | 14 | Complete Figma frames (all breakpoints) | Pending MCP quota |
 
 ## Core Pages

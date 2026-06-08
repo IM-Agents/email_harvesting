@@ -31,9 +31,17 @@ const normalizeDomain = (rawUrl) => {
     return { valid: false, error: "Malformed URL" }
   }
 
-  const host = parsed.hostname.toLowerCase().replace(/^www\./, "")
+  let host = parsed.hostname.toLowerCase().replace(/^www\./, "")
   if (!host || BLOCKED_HOSTS.has(host) || isPrivateIp(host)) {
     return { valid: false, error: "Invalid or internal domain" }
+  }
+
+  const parts = host.split(".")
+  if (parts.length >= 3) {
+    const subdomain = parts[0]
+    if (subdomain === "shop" || subdomain === "m" || subdomain === "store" || subdomain === "mobile") {
+      host = parts.slice(1).join(".")
+    }
   }
 
   return {

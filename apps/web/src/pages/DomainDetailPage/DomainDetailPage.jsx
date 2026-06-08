@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom"
 import { apiFetch } from "../../lib/apiFetch"
 import { BatchStatusBadge } from "../../components/BatchStatusBadge/BatchStatusBadge"
 import { ContactsTable } from "../../components/ContactsTable/ContactsTable"
+import { SourceTimeline } from "../../components/SourceTimeline/SourceTimeline"
 
 export const DomainDetailPage = () => {
   const { domainId } = useParams()
@@ -45,20 +46,7 @@ export const DomainDetailPage = () => {
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Source Attempts Timeline</h2>
-        <ol className="space-y-3">
-          {attempts.map((a) => (
-            <li key={a.id} className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
-              <div className="flex flex-wrap justify-between gap-2">
-                <span className="font-medium">{a.source}</span>
-                <BatchStatusBadge status={a.status} />
-              </div>
-              <p className="mt-1 text-slate-600">Contacts extracted: {a.contacts_extracted}</p>
-              {a.error_message && (
-                <p className="mt-1 text-red-600">{a.error_message}</p>
-              )}
-            </li>
-          ))}
-        </ol>
+        <SourceTimeline attempts={attempts} />
       </section>
 
       <section>

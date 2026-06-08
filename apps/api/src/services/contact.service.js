@@ -36,6 +36,7 @@ const listBatchContacts = async (batchId, userId, filters = {}) => {
   if (domain) query = query.andWhere("c.domain", "like", `%${domain}%`)
   if (has_email === "true") query = query.whereNotNull("c.email")
   if (has_email === "false") query = query.whereNull("c.email")
+  if (filters.job_title) query = query.andWhere("c.job_title", "like", `%${filters.job_title}%`)
 
   const items = await query.limit(limit).offset(offset)
   const [{ count }] = await db("contacts").where({ batch_id: batchId }).count({ count: "*" })
@@ -124,8 +125,8 @@ const retryDomain = async (domainId, userId) => {
   await db("domains").where({ id: domainId }).update({ status: "queued", error_message: null })
   await db("batches").where({ id: domain.batch_id }).update({ status: "processing" })
 
-  const { processBatchDomains } = require("./worker.service")
-  processBatchDomains(domain.batch_id).catch(console.error)
+  const { enqueueBatchProcessing } = require("../queue/domainQueue")
+  enqueueBatchProcessing(domain.batch_id).catch(console.error)
 
   return { domain_id: domainId, status: "queued" }
 }
