@@ -1,0 +1,47 @@
+## Test case docs — required folder structure (no automation)
+
+# Test Case Generation Rules
+
+Always follow this flow when generating functional test cases. Use skill `.cursor/skills/testcase-generation/` for templates, coverage techniques, and TC format.
+
+### When to create the `test/` folder
+
+- **Do not create** `test/` or any `test/[page-name].md` until implementation is complete and you have reviewed:
+  - Root `README.md`
+  - Relevant `docs/**`
+  - The codebase (routes/pages/APIs, `package.json` scripts, env/config)
+
+### Required layout (repo root)
+
+- **Create `test/` at the repository / monorepo root** (sibling to `apps/`, `packages/`, `src/`).
+- **Create `test/README.md`** as the index for all test case markdown.
+- **Create exactly one markdown file per page/screen/route**:
+  - Path: `test/[page-name].md`
+  - Filename: kebab-case derived from the **real** page name (route or screen title). Do not invent names.
+- **Combine all features on the same page into a single file** (`test/[page-name].md`). Do not split by widget/module when they live on the same page.
+
+Example:
+
+```text
+my-project/
+├── apps/
+├── packages/
+└── test/                  ← REQUIRED — markdown functional test cases
+    ├── README.md          ← REQUIRED — index
+    ├── [page-name].md     ← one file per page/screen/route
+    └── ...
+```
+
+### Placement rules (must follow)
+
+- **MUST** use folder name `test/` for markdown test case documentation.
+- **MUST NOT** put markdown test cases in `docs/`, `plan/`, or inside application folders (e.g. `apps/*`, `src/*`).
+- **MUST NOT** use alternative roots like `test-cases/` or a single mega file like `test/all-pages.md`.
+
+### Page-wise scope rules
+
+- **One page → one file**: `test/[page-name].md`
+- **Cross-page flows**: only create a separate file when a workflow truly spans pages; reference the relevant page files.
+- **API-only scope (no UI page)**: create one file per API resource or endpoint group; name it after that group.
+
+

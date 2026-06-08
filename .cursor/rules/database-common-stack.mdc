@@ -1,0 +1,199 @@
+---
+description: Shared relational database standards across MySQL and PostgreSQL — includes default MySQL env for local/Docker
+globs: **/db/**/*.sql,**/db/**/*.ddl,**/database/**/*.sql,**/database/**/*.ddl,**/migrations/**/*.sql,**/migrations/**/*.ddl,**/.env*,**/knexfile.js
+alwaysApply: true
+---
+
+# Relational Database Common Standards
+
+## MySQL environment (placeholders)
+
+Shared rules for **any** `{monorepo}` using MySQL (Knex / `mysql2`). Engine detail: `./rules/mysql-stack.mdc`. Env priority: `./rules/env-variables.mdc` § Database env priority.
+
+| Placeholder | Meaning |
+|-------------|---------|
+| `{monorepo}` | Repository root |
+| `{root folder name}` | `basename` of `{monorepo}` — used in `PUBLIC_PATH='/qa/{root folder name}'` |
+| `{db_name}` | **This project’s** dedicated MySQL schema — **MUST** be unique per app on shared MySQL |
+| `{platform_db_name}` | Platform default when the app **is** the main IM agent — `im_agent_local` |
+
+### Per-project database name (child / QA monorepos)
+
+On shared MySQL (IM platform), the parent process may set `DB_NAME={platform_db_name}` (`im_agent_local`).
+Each `{monorepo}` **MUST** define a dedicated **`DB_NAME={db_name}`** in `{monorepo}/.env` and `{monorepo}/.env.example`.
+`loadEnv()` **MUST** force `DB_NAME` from `{monorepo}/.env` after dotenv (`applyProjectDatabaseEnv`) so Knex does **not** migrate against another app’s schema.
+
+| Context | `DB_NAME` |
+|---------|-----------|
+| IM agent main app | `{platform_db_name}` (`im_agent_local`) |
+| Child app under `/app/data/ai_task/{root folder name}/` | `{db_name}` unique per app |
+
+**MUST** set `DB_NAME` in `{monorepo}/.env` to a dedicated `{db_name}` — **never** reuse `{platform_db_name}` for a child QA app.
+
+**Examples (not rule defaults):**
+
+| `{root folder name}` | Example `{db_name}` |
+|----------------------|---------------------|
+| `login` | `login_app` |
+| `calculator` | `calculator_app` |
+| IM agent main repo | `{platform_db_name}` (`im_agent_local`) |
+
+### Connection variables (Docker vs local host)
+
+Shared Docker credentials (`.env.docker`, parent inject) — **do not** put child `{db_name}` in platform files unless that app **is** the main agent:
+
+```bash
+# Database Configuration (shared MySQL service — platform)
+DB_HOST=db
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=wawO=upD8EH!=upH!
+```
+
+Per-project in **`{monorepo}/.env.example`**:
+
+```bash
+# Local host dev
+DB_HOST=localhost
+DB_NAME={db_name}
+
+# Docker: DB_HOST=db from container/shell — MUST NOT let .env DB_HOST=localhost override inside IM platform app container
+```
+
+| Variable | Docker (IM platform app container) | Local host dev |
+|----------|--------------------------------------|----------------|
+| `DB_HOST` | **`db`** from shell/container — wins over `.env` `localhost` | `localhost` |
+| `DB_PORT` / `DB_USER` / `DB_PASSWORD` | Shell/Docker wins (same as platform) | From `.env` |
+| `DB_NAME` | **`{monorepo}/.env` wins** — `{db_name}` | `{db_name}` from `.env` |
+
+### Create database if missing (`db:init`)
+
+If MySQL is reachable but schema **`{db_name}`** does not exist:
+
+1. Ensure `{monorepo}/.env` has correct `DB_*` (especially `DB_NAME={db_name}`).
+2. **`npm run db:init`** — `scripts/init-db.js`: `CREATE DATABASE` if absent + `knex migrate:latest`.
+3. Migrations only: **`npm run db:migrate`** (from `apps/api/` or backend package root).
+
+**`db:init` does NOT fix** wrong migration history on an **existing** database (see corrupt migrations below).
+
+### Knex: “migration directory is corrupt”
+
+Usually **wrong `DB_NAME`** (migrations ran against `{platform_db_name}` or another app’s schema).
+
+1. Confirm `process.env.DB_NAME` after `loadEnv()` equals `{db_name}` from `{monorepo}/.env`.
+2. **MUST NOT** point child app at `{platform_db_name}`.
+3. Dev fix: `DROP`/`CREATE` schema `{db_name}` (or new name), then `npm run db:init --workspace=api` (or backend `db:init`).
+4. Preview: `ensureDatabaseForPreview` runs `db:migrate` then `db:init` only on **missing** DB — corrupt state needs manual schema reset.
+
+### Preview & API migrate
+
+- **Preview:** `preview-start.js` **MUST** run `db:migrate` before spawn; `db:init` only if DB missing — `architecture.mdc` § 3.2.
+- **API boot:** **MAY** run `migrate.latest` on start — does not replace preview step or fix corrupt migrations.
+
+### Verify schema (tables) + test DB-backed APIs (Required when MySQL is used)
+
+Whenever the backend uses **MySQL** (new migrations, models, controllers, or task touches `{db_name}`), after preview is up and `/api/health` passes:
+
+#### A — Tables and migrations (do this first)
+
+1. **MUST** confirm all migrations are applied: `npm run db:status` (from `apps/api/` or `app/backend/`).
+2. **MUST** build the **expected table list** from `migrations/` (`createTable` / `tableName`), models, and `{monorepo}/README.md` (if documented).
+3. **MUST** verify those tables exist in `{db_name}` — not only that the database exists:
+
+```bash
+# Pending migrations?
+npm run db:status
+
+# List tables in schema (adjust host/user; use DB_* from .env)
+mysql -h "${DB_HOST:-localhost}" -u "${DB_USER:-root}" -p"${DB_PASSWORD}" \
+  -e "SHOW TABLES FROM \`${DB_NAME}\`;"
+
+# Optional: Knex programmatic check in a one-off script or REPL
+# knex.schema.hasTable('users') → must be true for every table the app uses
+```
+
+4. **MUST** fix **missing tables** or **pending migrations** before API testing:
+   - Pending rows in `db:status` → `npm run db:migrate`
+   - Table missing but migration exists → `db:migrate`; if still missing, check wrong `DB_NAME` or corrupt `knex_migrations` (§ Knex corrupt migrations)
+   - Table missing and no migration → add migration (`createTable`), `db:migrate`, confirm `SHOW TABLES`
+5. **MUST** fix **wrong/missing columns** the same way (new migration + `db:migrate`, then re-check).
+
+| Symptom | Likely fix |
+|---------|------------|
+| `db:status` shows pending migrations | `npm run db:migrate` on `{db_name}` |
+| `ER_NO_SUCH_TABLE` / `Table '…' doesn't exist` | Apply or author missing migration; verify `DB_NAME={db_name}` |
+| Table exists in wrong schema | Wrong `DB_NAME` — use dedicated `{db_name}` in `.env` |
+| Migration applied but table still missing | Corrupt `knex_migrations` or wrong DB — reset `{db_name}` (dev), `db:init` |
+
+#### B — DB-backed API routes (after schema is complete)
+
+1. **MUST** list every API route that reads/writes the database (route files, `README.md`, OpenAPI, or grep `knex` / models).
+2. **MUST** call each route on preview (`/qa/{root folder name}/api/...` or direct `API_PORT`) with valid sample bodies/params.
+3. **MUST** fix connection, query, validation, or seed issues **before** the next feature — **do not** skip failing endpoints.
+4. **MUST** re-test fixed route(s), then proceed.
+
+| Symptom | Likely fix |
+|---------|------------|
+| `500` + Knex / ECONNREFUSED | `{db_name}`, `DB_HOST=db`, `db:migrate` / `db:init`, corrupt schema (above) |
+| `500` + SQL error (not “table doesn't exist”) | Wrong column/FK; fix migration + `db:migrate` |
+| `404` on `/api/v1/...` via proxy | Missing `/api` prefix — `architecture.mdc` § 4.2.1 |
+| Empty/wrong data | Seed script, fixtures, or handler logic |
+
+```bash
+# Example — adjust paths/methods per {monorepo} README
+BASE="http://127.0.0.1:${PORT}/qa/${ROOT_FOLDER}"
+curl -sf -X POST "${BASE}/api/v1/auth/login" -H "Content-Type: application/json" -d '{"email":"test@example.com","password":"testpass123"}'
+```
+
+Gate detail: `architecture.mdc` § 4.3 Step 3b; `pre-work-requirements.mdc` § 6.
+
+**Agent checklist**
+
+- [ ] `{monorepo}/.env.example` sets `DB_NAME={db_name}` (not `{platform_db_name}` for child apps)
+- [ ] `loadEnv` applies `DB_NAME` from root `.env` only (`env-variables.mdc`)
+- [ ] Docker: `DB_HOST=db` not overridden by `localhost` in container
+- [ ] `knexfile.js` reads `DB_*` from `process.env` (no hard-coded credentials)
+- [ ] `db:init` when schema is new; corrupt migrations → reset `{db_name}` schema, not only re-run `db:init`
+- [ ] `db:status` clean; **all expected tables** present in `{db_name}` (no missing tables/columns)
+- [ ] **All DB-backed API routes** exercised on preview; failures fixed before marking work done
+
+---
+
+## Universal relational rules
+
+- **MUST** start with normalized schema (target 3NF for OLTP).
+- **MUST** use parameterized queries only; no string-interpolated SQL.
+- **MUST** keep naming consistent (`snake_case`, clear PK/FK/audit fields).
+- **MUST** enforce least-privilege DB access and separation of migration/runtime roles.
+
+## Performance and reliability rules
+
+- **MUST** list only needed columns in `SELECT` statements—never use `SELECT *`.
+- **MUST** inspect plans for hot queries (`EXPLAIN` variants per engine).
+- **MUST** keep queries bounded with safe limits/cursors.
+- **SHOULD** prefer keyset pagination for large datasets.
+- **SHOULD** optimize by p95/p99 impact first, not anecdotal slow paths.
+
+## Data safety rules
+
+- **MUST** define backup, restore, and PITR expectations by RPO/RTO.
+- **MUST** protect PII in storage, access, and non-prod snapshots.
+- **MUST NOT** deploy schema changes without rollback/mitigation plan.
+
+## Review checklist
+
+- [ ] SQL is parameterized and bounded
+- [ ] `SELECT` lists only needed columns (no `*`)
+- [ ] Index/plan checks done for changed queries
+- [ ] Security and least-privilege constraints preserved
+- [ ] Migration and recovery implications documented
+
+## Example
+
+```sql
+SELECT id, created_at
+FROM orders
+WHERE (created_at, id) < (?, ?)
+ORDER BY created_at DESC, id DESC
+LIMIT 50;
+```

@@ -1,0 +1,68 @@
+---
+description: Python 3.11+ structure, typing, Pydantic, FastAPI/Django, and security best practices
+globs: **/*.py, **/pyproject.toml, **/tests/**/*
+alwaysApply: false
+---
+
+# Python Best Practices
+
+Full standards: `.cursor/skills/python/SKILL.md` · Reference: `.cursor/skills/python/reference/`
+
+## Project structure
+
+- **MUST** use layered layout: route/view → service → repository; no raw SQL in route handlers.
+- **MUST** validate config at startup (`pydantic-settings` or framework settings).
+- **SHOULD** use `src/` package layout and one lockfile (`uv.lock`, `poetry.lock`, or pinned requirements).
+- **MUST** commit `.env.example` only—never secrets in repo.
+
+## Style and typing
+
+- **MUST** follow PEP 8: `snake_case` functions/modules, `PascalCase` classes.
+- **MUST** type-hint all public functions; run **mypy** or **pyright** in CI.
+- **MUST NOT** use bare `except:` or swallow errors without logging.
+- **SHOULD** use Pydantic v2 for HTTP request/response models.
+- **AVOID** bare `Any`; use `object` or generics at boundaries.
+
+```python
+# ✅ GOOD
+def get_order(order_id: str) -> OrderResponse | None:
+    ...
+
+# ✗ BAD
+def get_order(order_id):  # missing types
+    ...
+```
+
+## Database and SQL
+
+- **MUST** use parameterized queries / SQLAlchemy bindings—never f-string SQL with user input.
+- **MUST** list only needed columns—never `SELECT *`.
+- **MUST** keep queries in repositories, not in API route files.
+
+```python
+# ✅ GOOD
+stmt = select(Order.id, Order.status, Order.total_cents).where(Order.id == order_id)
+
+# ✗ BAD
+session.execute(text(f"SELECT * FROM orders WHERE id = '{order_id}'"))
+```
+
+## HTTP APIs (FastAPI / Django)
+
+- **MUST** validate bodies with Pydantic or serializers at the boundary.
+- **MUST** map domain exceptions to consistent JSON errors in one handler.
+- **SHOULD** use async only with async I/O; offload blocking calls via `asyncio.to_thread` or sync routes.
+- **SHOULD** use keyset/cursor pagination for large lists.
+
+## Security and tooling
+
+- **MUST** store secrets in environment or secret manager.
+- **MUST NOT** use `pickle`/`eval`/`exec` on untrusted data.
+- **SHOULD** run **Ruff** + **pytest** + dependency audit in CI.
+
+## Anti-patterns
+
+- Mutable default arguments (`def f(items=[])`).
+- Blocking ORM/network in `async def` without async driver or thread offload.
+- Business logic only in route handlers without services.
+- `# type: ignore` without comment and tracking issue.

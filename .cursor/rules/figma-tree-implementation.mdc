@@ -1,0 +1,251 @@
+---
+description: Page-wise Figma implementation — prototype tree first, inventory components via MCP, build atoms then pages (Button, Carousel, etc.). Apply when implementing UI from Figma page-by-page.
+globs: "**/*.{tsx,jsx,vue,css,module.css}"
+alwaysApply: false
+---
+
+# Figma tree — page-wise implementation
+
+**Load skill first:** `.cursor/skills/figma-tree-todo/SKILL.md`  
+**Index (read only):** `.cursor/skills/figma-tree-todo/reference/figma-tree-index.md`  
+**Related:** `.cursor/rules/figma-tree-structure-checklist.mdc`, `.cursor/skills/figma-design/SKILL.md`, `.cursor/rules/architecture.mdc` §5
+
+Use this rule when the user gives **one page / one screen** (or a page section) to implement from Figma.
+
+## Mandatory order (MUST NOT skip)
+
+```
+0. figma-tree index  → read docs/figma-tree.md if present; if missing → ask user (do NOT auto-create)
+1. Prototype tree   → POST /api/prototype-tree (align with index or user-provided fileKey/nodeId)
+2. MCP discovery    → get_metadata on entry frame + linked destinations
+3. Count checklist  → Components: N | Images: N | Icons: N (see asset-inventory.md)
+3b. Animation audit → Animations: N; if N > 0 implement CSS motion (animations-from-figma.md)
+4. Find gaps        → If NOT in figma-tree.md → get_metadata + get_design_context first
+5. Create components → get_design_context per component; **validate lint/types after each**; context7 then web search if invalid
+6. Export assets    → **Figma MCP only** (get_screenshot + get_design_context) → assets/images/, assets/icons/
+7. CSS & tokens     → get_variable_defs + position/z-index (css-from-figma.md)
+8. Compose page     → components + local assets only
+9. Wire interactions → NAVIGATE / CHANGE_TO / OVERLAY from tree
+10. Update index    → docs/figma-tree.md when new verified links (design phase only)
+```
+
+- **MUST NOT** build a full page frame before shared components exist.
+- **MUST NOT** hardcode one-off markup for elements that appear as Figma **components** or **instances**.
+- **MUST** dedupe prototype links (e.g. `CHANGE_TO` carousel → one link per variant, not per duplicate hotspot).
+
+## Step 0 — `docs/figma-tree.md` (read only)
+
+**Reference:** `.cursor/skills/figma-tree-todo/reference/figma-tree-index.md`
+
+| State | Action |
+|-------|--------|
+| `{monorepo}/docs/figma-tree.md` **exists** | Read **Requirements** + Navigation Tree; use as scope for this page |
+| **Missing** | **MUST NOT** create the file — **ask user** for index or Figma URL + scope; use prototype-tree output for requirements **in summary only** |
+
+- **MUST NOT** implement full UI without index **or** explicit user-confirmed scope.
+- **MUST** derive **Requirements summary** from index when present (`pre-work-requirements.mdc` § 2).
+
+## Step 1 — Prototype tree (before any code)
+
+| Input | Action |
+|-------|--------|
+| `fileKey`, `nodeId`, token | `POST /api/prototype-tree` → markdown nav tree |
+| Existing `docs/figma-tree.md` | Read entry page, tabs, overlays, slider states; sync tree output into index if new screens found |
+
+From the tree, record for **this page**:
+
+- Entry frame `node-id` and URL
+- **NAVIGATE** tabs / screen transitions
+- **CHANGE_TO** states (sliders, toggles, variant swaps)
+- **OVERLAY** modals / dialogs
+- Standalone reusable nodes (overlays, modals)
+
+## Step 2 — Figma MCP per page (MUST)
+
+Load `.cursor/skills/figma-design/SKILL.md` and run in order:
+
+| # | MCP tool | Purpose |
+|---|----------|---------|
+| 1 | `whoami` | Confirm auth |
+| 2 | `get_metadata` | Page frame exists; list child components |
+| 3 | `get_design_context` | Layout, typography, spacing per component |
+| 4 | `get_screenshot` | Visual reference for page + each component |
+| 5 | `get_variable_defs` / `search_design_system` | Tokens and library reuse |
+| 6 | `use_figma` | Only when creating/updating Figma (write access) |
+
+For **each linked destination** in the prototype tree (tabs, slide variants, overlays), repeat `get_design_context` on that `node-id`.
+
+## Step 2b — CSS, position, z-index, colors (MUST)
+
+**Reference:** `.cursor/skills/figma-tree-todo/reference/css-from-figma.md`
+
+| # | MCP tool | Extract |
+|---|----------|---------|
+| 1 | `get_variable_defs(fileKey, nodeId)` | **Color tokens**, spacing, radius variables |
+| 2 | `get_design_context(fileKey, nodeId)` | Full **CSS reference** — layout, typography, fills, shadows, borders |
+| 3 | `get_metadata(fileKey, nodeId)` | **x, y, width, height** — position audit, sibling order for **z-index** |
+
+Rules:
+
+- **MUST** pull **colors** from `get_variable_defs` first; fall back to exact fills in `get_design_context`
+- **MUST NOT** hardcode hex/rgb when a Figma variable exists for that property
+- **MUST** check **position** — `relative` parent + `absolute`/`fixed` children when Figma uses constraints
+- **MUST** map **z-index** from Figma sibling order (backdrops > content > background; control hotspots above panel)
+- **MUST** copy exact px values from MCP — no approximations
+- **MUST** verify stacking with `get_screenshot` (overlays, modals, slider controls not hidden)
+
+Token file example (create before components):
+
+```css
+:root {
+  /* from get_variable_defs — exact values from MCP (example shape only) */
+  --color-primary: #1a1a1a;
+  --color-text: #333333;
+}
+```
+
+## Step 2c — Animation audit (MUST)
+
+**Reference:** `.cursor/skills/figma-tree-todo/reference/animations-from-figma.md`
+
+- **MUST** scan prototype tree for `transition` (e.g. `SMART_ANIMATE`, `DISSOLVE`, `MOVE_IN`) and hover sections
+- **MUST** document **`Animations: N`**; if N > 0, inventory table + **CSS** implementation (`transition`, `@keyframes`, motion tokens)
+- If motion exists but is **not** in `docs/figma-tree.md` → discover via prototype re-parse + `get_design_context` first
+- **SHOULD** add `prefers-reduced-motion: reduce` overrides
+- **MUST NOT** skip animation when Figma prototype clearly animates the interaction
+
+## Step 2d — Count checklist: components, images, icons (MUST)
+
+**Reference:** `.cursor/skills/figma-tree-todo/reference/asset-inventory.md`
+
+- **MUST** publish totals: `Components: X | Images: Y | Icons: Z` for the page frame `nodeId`
+- **MUST** compare against `docs/figma-tree.md` — anything **not listed** in the tree **MUST** be discovered via `get_metadata` / `get_design_context` before coding
+- **MUST NOT** skip image/icon layers because the prototype tree omits them
+
+| Category | How to count | Export target |
+|----------|--------------|---------------|
+| Components | `COMPONENT`, `COMPONENT_SET`, `INSTANCE` in metadata | `components/ui/`, `components/` |
+| Images | Frames with image fills, photos, illustrations | `assets/images/` |
+| Icons | Vectors, icon components, small marks | `assets/icons/` |
+
+## Step 3 — Component inventory (MUST before files)
+
+On the target page frame, list:
+
+| Type | Examples | Code location |
+|------|----------|---------------|
+| Atoms | Button, Input, Label, Icon | `components/ui/` or stack equivalent |
+| Composites | Carousel, Keypad, NavBar, FormRow | `components/` |
+| Page shell | `FeaturePage`, `SettingsPage` (match route name) | `pages/` or `app/` routes |
+
+Rules:
+
+- **MUST** map each Figma **COMPONENT** / **INSTANCE** to one code component.
+- **MUST** note **variant properties** (e.g. `Variant=1|2|3`, `State=Default|Hover` — names from Figma).
+- **MUST** note **prototype triggers** on instances (click → `CHANGE_TO` destination).
+
+## Step 4 — Create component files first — Figma MCP (MUST)
+
+Create files in **dependency order** (components **before** page; assets export in Step 4b):
+
+1. Tokens / CSS variables — **`get_variable_defs`** (colors, spacing, radius)
+2. Atoms — `Button`, `Input`, … — **`get_design_context`** per component node
+3. Composites — `Carousel` / variant sets (with `CHANGE_TO` states), `Tabs`, … — **position + z-index**
+4. Page — composes instances only — **after** Step 4b
+
+## Step 4b — Images & icons from Figma MCP (MUST)
+
+- **MUST** obtain every image and icon **from the Figma MCP server** (`fileKey` + `nodeId`) — not placeholders, stock sites, or manual files
+- **Images:** `get_screenshot(fileKey, nodeId)` → `assets/images/`; plus download any image URL from `get_design_context`
+- **Icons:** `get_design_context` (SVG when returned) or `get_screenshot` (2x PNG) → `assets/icons/`
+- **MUST** save under `assets/images/` and `assets/icons/` (or `src/assets/…`, `public/…` per project)
+- **MUST NOT** use `upload_assets` for export; **MUST NOT** commit hotlinked Figma CDN URLs
+
+Example (page with `CHANGE_TO` variant carousel):
+
+```
+components/ui/Button.tsx
+components/ui/Carousel.tsx    ← handles Variant=1|2|3 from CHANGE_TO tree
+pages/FeaturePage.tsx         ← composes <Carousel />, <Button />
+```
+
+- **MUST** use TypeScript props for variants matching Figma component properties.
+- **MUST** apply CSS from MCP: colors (variables), position, z-index, typography, shadows — see css-from-figma reference.
+- **MUST** reuse existing project components when intent matches (grep before creating).
+- **SHOULD** add `data-testid` on interactive nodes for E2E.
+
+## Step 4a — Validate component code (MUST)
+
+**Reference:** `.cursor/skills/figma-tree-todo/reference/component-code-validation.md`
+
+After **each** new/updated component (and again after the page file):
+
+- **MUST** run linter + typecheck (`npm run lint`, `tsc --noEmit`, or `turbo run lint` / `build` per project)
+- **MUST** fix errors before creating the next component
+- If errors persist after local fixes → **context7 MCP first** (official docs), then **web search** (exact error + library version)
+- **MUST NOT** compose the full page while components still fail lint/types
+
+## Step 5 — Prototype interactions in code
+
+| Figma navigation | Implementation |
+|------------------|----------------|
+| `NAVIGATE` | Route change / tab panel swap |
+| `CHANGE_TO` | Local state → component variant (e.g. carousel step index) |
+| `OVERLAY` | Modal / dialog open |
+| `ON_HOVER` | CSS `:hover` / `:focus-visible` + `transition` (see animations-from-figma.md) |
+| Animated `NAVIGATE` / `CHANGE_TO` / `OVERLAY` | CSS `transition` / `@keyframes` matching Figma `transition` type |
+
+- **MUST** implement all **primary** prototype paths listed in the tree for that page.
+- **MUST NOT** create duplicate nav entries for the same destination (dedupe by `destinationId`).
+
+## Step 6 — File checklist (per page)
+
+Before marking page done:
+
+- [ ] Prototype tree fetched; entry + destinations documented
+- [ ] MCP verified every `node-id` used
+- [ ] **Colors** extracted via `get_variable_defs`; mapped to CSS variables
+- [ ] **CSS** extracted via `get_design_context` per component (no guessed values)
+- [ ] **Position** checked via `get_metadata` (absolute children, inset values)
+- [ ] **z-index** set for overlapping layers (backdrop, modal, control hotspots)
+- [ ] Count checklist: **Components / Images / Icons** totals documented
+- [ ] **Animations: N** audited; CSS motion implemented when N > 0
+- [ ] Items not in figma-tree found via MCP and added to inventory
+- [ ] Component inventory written (atoms → composites)
+- [ ] All component files created **before** page file
+- [ ] Each component validated (lint/types); context7 then web search used if needed
+- [ ] **Forms** with validation: **Formik + Yup** (`react-stack.mdc`) — not manual per-field validators
+- [ ] All images/icons saved under `assets/images/`, `assets/icons/`
+- [ ] Page file uses component instances, not copy-pasted frame markup
+- [ ] `CHANGE_TO` variants / tabs / overlays match prototype tree links
+- [ ] Visual check: `get_screenshot` vs rendered page (colors, stacking, spacing)
+- [ ] `docs/figma-tree.md` updated if new links were created (design phase)
+
+## API reference (prototype tree)
+
+```bash
+curl -X POST http://localhost:4001/api/prototype-tree \
+  -H "Content-Type: application/json" \
+  -d '{"fileKey":"{fileKey}","token":"{FIGMA_TOKEN}","nodeId":"{sectionOrFrameId}"}'
+```
+
+Response: markdown with `[ENTRY]`, `Tabs (NAVIGATE)`, `CHANGE_TO` variant blocks, `Overlays`, etc.
+
+## When all pages are done — preview gate (MUST)
+
+After **all** requested Figma pages/components are implemented:
+
+1. Run `PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run preview`
+2. Verify local + public health (`architecture.mdc` § 4.3, `pre-work-requirements.mdc` § 6)
+3. If preview fails: fix build/proxy/API paths; if MySQL — `{db_name}`, migrations, **missing tables** (`db:status`, `SHOW TABLES`), then test **all** DB-backed APIs before done (`database-common-stack.mdc`)
+4. `preview:stop` when passing; include health URLs in the summary
+
+## When user says "implement this page from Figma"
+
+1. **Check** `docs/figma-tree.md` — read if present; if missing, **ask user** (do not auto-create)
+2. Ask or infer: `fileKey`, page `nodeId` (from index or user)
+3. Run prototype tree API; align with index
+4. Derive **Requirements summary** from index + tree
+5. Load figma-tree-todo skill and execute checklist
+6. Create **all** component files, then page file
+7. Report: files created, prototype paths wired, any MCP blockers

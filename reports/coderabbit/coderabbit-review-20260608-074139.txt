@@ -1,0 +1,2198 @@
+Notice: Detected cursor environment. Use `coderabbit review --agent` for structured agent-friendly output.
+╔═══════════════════════════════════════════╗
+║                                           ║
+║   New update available! 0.5.3 -> 0.5.4    ║
+║          Run: coderabbit update           ║
+║                                           ║
+╚═══════════════════════════════════════════╝
+
+Connecting to CodeRabbit... 1s elapsed
+
+   !   CodeRabbit could not match IM-Agents/email_harvesting to an installed
+       organization you can access. This review will run with limited/free CLI
+       behavior and is subject to free CLI review limits. Install CodeRabbit for
+       IM-Agents/email_harvesting to enable full review features.
+
+────────────────────────────────────────
+CodeRabbit Review
+
+Diff      : all local changes (committed + uncommitted)
+Compare   : email_main → email_main
+Directory : email_harvesting
+────────────────────────────────────────
+
+(\(\
+(• .•)  First, solve the problem. Then, write the code. - John Johnson
+
+Preparing review... 3s elapsed
+Preparing review... 1m 03s elapsed - still working
+Preparing review... 2m 03s elapsed - still working
+Preparing review... 3m 03s elapsed - still working
+Preparing review... 4m 03s elapsed - still working
+Preparing review... 5m 03s elapsed - still working
+Preparing review... 6m 03s elapsed - still working
+Preparing review... 7m 03s elapsed - still working
+Preparing review... 8m 03s elapsed - still working
+Preparing review... 9m 03s elapsed - still working
+Summarizing changes... 9m 41s elapsed - still working
+Summarizing changes... 10m 03s elapsed - still working
+Summarizing changes... 11m 03s elapsed - still working
+Summarizing changes... 12m 03s elapsed - still working
+Writing review comments... 12m 08s elapsed - still working
+Writing review comments... 13m 03s elapsed - still working
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/batches.routes.js:72apps/api/src/routes/batches.routes.js:72-82]8;;
+
+  Validate batchId is a positive integer before passing to service.
+
+  Number(req.params.batchId) returns NaN for non-numeric strings and
+  negative numbers could cause unexpected behavior. Add validation at the
+  boundary.
+
+
+
+
+
+  🛡️ Proposed fix
+
+   batchesRouter.get(
+     "/:batchId",
+     asyncHandler(async (req, res) => {
+       try {
+  -      const data = await getBatchDetail(Number(req.params.batchId), req.user.id)
+  +      const batchId = parseInt(req.params.batchId, 10)
+  +      if (!Number.isFinite(batchId) || batchId <= 0) {
+  +        return error(res, "VALIDATION_ERROR", "Invalid batch ID", 400)
+  +      }
+  +      const data = await getBatchDetail(batchId, req.user.id)
+         return success(res, data)
+       } catch (err) {
+         return error(res, err.code || "ERROR", err.message, err.status || 500)
+       }
+     })
+   )
+
+  Apply similar validation to all routes using Number(req.params.batchId).
+
+
+
+  Also applies to: 99-109
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/scripts/preview-start.js:41scripts/preview-start.js:41-50]8;;
+
+  Close server in error handler to prevent resource leak.
+
+  The isPortAvailable function doesn't close the server in the error path
+  before resolving. While the server likely hasn't started listening yet,
+  it's cleaner to ensure cleanup.
+
+
+
+
+
+  ♻️ Proposed fix
+
+   const isPortAvailable = (port) =>
+     new Promise((resolve) => {
+       const server = net.createServer()
+  -    server.once("error", () => resolve(false))
+  +    server.once("error", () => {
+  +      server.close()
+  +      resolve(false)
+  +    })
+       server.once("listening", () => {
+         server.close()
+         resolve(true)
+       })
+       server.listen(port, "127.0.0.1")
+     })
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/batches.routes.js:111apps/api/src/routes/batches.routes.js:111-122]8;;
+
+  Inline require inside route handler is non-idiomatic.
+
+  Move the require to the top of the file with other imports for
+  consistency and to avoid repeated module resolution on each request
+  (though Node caches modules, the pattern is unusual).
+
+
+
+
+
+  ♻️ Proposed fix
+
+  At top of file (around line 16):
+
+  -const { listBatchContacts } = require("../services/contact.service")
+  +const { listBatchContacts, listBatchDomains } = require("../services/contact.service")
+
+  Then in the handler:
+
+   batchesRouter.get(
+     "/:batchId/domains",
+     asyncHandler(async (req, res) => {
+       try {
+  -      const { listBatchDomains } = require("../services/contact.service")
+         const data = await listBatchDomains(Number(req.params.batchId), req.user.id, req.query)
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/fileParser.service.js:7apps/api/src/services/fileParser.service.js:7-91]8;;
+
+  Function exceeds 50-line limit.
+
+  The parseSpreadsheet function is 85 lines long, exceeding the 50-line
+  guideline. As per coding guidelines, new functions over 50 lines should be
+  flagged. Consider splitting into smaller focused functions for better
+  maintainability.
+
+
+
+
+  Suggested split:
+  - readFileByExtension(filePath, originalName) → lines 11-23
+  - validateRequiredColumn(rows, columnName) → lines 32-39
+  - validateAndNormalizeRows(rows, storeUrlKey) → lines 41-83
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/components/BatchStatusBadge/BatchStatusBadge.jsx:11apps/web/src/components/BatchStatusBadge/BatchStatusBadge.jsx:11-18]8;;
+
+  Handle null/undefined status display.
+
+  When status is null or undefined, line 15 will render an empty
+  string inside the badge span (due to optional chaining), creating an empty
+  colored pill. Consider displaying a fallback label like "Unknown" for
+  better UX.
+
+
+
+
+
+  🎨 Add fallback label
+
+   export const BatchStatusBadge = ({ status }) => {
+     const style = STATUS_STYLES[status] || STATUS_STYLES.uploaded
+  +  const label = status ? status.replace(/_/g, " ") : "unknown"
+     return (
+       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${style}`}>
+  -      {status?.replace(/_/g, " ")}
+  +      {label}
+       </span>
+     )
+   }
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/auth.routes.js:11apps/api/src/routes/auth.routes.js:11-14]8;;
+
+  Consider using a schema validation library for input validation.
+
+  The current validation only checks for the presence of email and
+  password fields. For production authentication endpoints, consider using
+  Joi or a similar library to validate:
+  - Email format (RFC 5322 compliance)
+  - Password constraints (minimum length, complexity if required)
+  - Request body shape and type safety
+
+
+
+
+
+  📋 Example with Joi validation
+
+  const Joi = require("joi")
+  
+  const loginSchema = Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().min(8).required()
+  })
+  
+  authRouter.post(
+    "/login",
+    asyncHandler(async (req, res) => {
+      const { error: validationError, value } = loginSchema.validate(req.body)
+      if (validationError) {
+        return error(res, "VALIDATION_ERROR", validationError.details[0].message, 400)
+      }
+      const data = await login(value.email, value.password)
+      return success(res, data)
+    })
+  )
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/app.js:11apps/api/src/app.js:11]8;;
+
+  CORS wildcard fallback requires security review.
+
+  Line 11 configures CORS to accept all origins (`) when CORS_ORIGIN` is
+  not set. This is a security risk in production environments. As per coding
+  guidelines, new CORS rules with Access-Control-Allow-Origin:  must be
+  flagged for security review.
+
+
+
+
+
+  🔒 Proposed fix to require explicit CORS configuration
+
+  -app.use(cors({ origin: env.CORS_ORIGIN || "*" }))
+  +if (!env.CORS_ORIGIN) {
+  +  throw new Error("CORS_ORIGIN environment variable is required")
+  +}
+  +app.use(cors({ origin: env.CORS_ORIGIN }))
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/admin.routes.js:19apps/api/src/routes/admin.routes.js:19-25]8;;
+
+  Missing input validation on PATCH /settings endpoint.
+
+  The PATCH handler uses req.body || {} without validating the request
+  body at the application boundary. Per coding guidelines, you MUST validate
+  HTTP body/query/params at the boundary before domain logic. Malicious or
+  malformed input could reach updateSettings() unchecked.
+
+
+
+
+
+  🛡️ Add validation middleware
+
+  Consider adding a validation middleware before the handler:
+
+  +const validateSettings = (req, res, next) => {
+  +  const schema = Joi.object({
+  +    worker_count: Joi.number().integer().min(1).max(100).optional(),
+  +    source_timeouts: Joi.object().optional(),
+  +    retry_backoff_seconds: Joi.array().items(Joi.number()).optional(),
+  +    proxy_enabled: Joi.boolean().optional(),
+  +    headless: Joi.boolean().optional(),
+  +  }).unknown(false)
+  +  
+  +  const { error, value } = schema.validate(req.body)
+  +  if (error) {
+  +    return res.status(400).json({ error: error.message })
+  +  }
+  +  req.body = value
+  +  next()
+  +}
+  
+   adminRouter.patch(
+     "/settings",
+  +  validateSettings,
+     asyncHandler(async (req, res) => {
+  -    const data = await updateSettings(req.body || {})
+  +    const data = await updateSettings(req.body)
+       return success(res, data)
+     })
+   )
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/db/knex.js:4apps/api/src/db/knex.js:4]8;;
+
+  Hardcoded development environment may leak into production.
+
+  Line 4 selects knexConfig.development as the primary config, falling
+  back to the raw knexfile export. This will use the development database
+  configuration in production unless the knexfile properly exports
+  environment-specific configs.
+
+  The standard pattern is to respect NODE_ENV:
+
+
+
+
+
+  🔧 Respect NODE_ENV
+
+   const knex = require("knex")
+   const knexConfig = require("../../knexfile")
+  
+  -const config = knexConfig.development || knexConfig
+  +const environment = process.env.NODE_ENV || "development"
+  +const config = knexConfig[environment]
+  
+   const db = knex(config)
+  
+   module.exports = { db }
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/migrations/20250608000002_seed_defaults.js:7apps/api/migrations/20250608000002_seed_defaults.js:7]8;;
+
+  Hardcoded default admin password is a production security risk.
+
+  Line 7 hardcodes the password "admin123" directly in the migration file.
+  This creates a well-known default credential that will exist in every
+  deployment unless manually changed, which is a critical security
+  vulnerability.
+
+
+
+
+
+  🔐 Use environment variable or force password change
+
+  Option 1: Read from environment
+
+  -  const passwordHash = await bcrypt.hash("admin123", 10)
+  +  const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || (() => {
+  +    throw new Error("ADMIN_DEFAULT_PASSWORD must be set for seed migration")
+  +  })()
+  +  const passwordHash = await bcrypt.hash(defaultPassword, 10)
+
+  Option 2: Generate random password and log it
+
+  +  const crypto = require("crypto")
+  -  const passwordHash = await bcrypt.hash("admin123", 10)
+  +  const randomPassword = crypto.randomBytes(16).toString("hex")
+  +  const passwordHash = await bcrypt.hash(randomPassword, 10)
+  +  console.warn(`⚠️  Admin user created with password: ${randomPassword}`)
+  +  console.warn("⚠️  CHANGE THIS PASSWORD IMMEDIATELY")
+
+  Option 3: Require password reset on first login
+  Add a password_reset_required flag to the user record.
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/index.js:14apps/api/src/routes/index.js:14-20]8;;
+
+  Remove /v1 version prefix from API routes.
+
+  Lines 14-20 mount routes with a /v1 prefix, which violates the coding
+  guideline. As per coding guidelines, API paths MUST use /api/... format
+  without hardcoded version prefixes like /v1/....
+
+
+
+
+
+  ♻️ Proposed fix to remove version prefix
+
+  -router.use("/v1/auth", authRouter)
+  -router.use("/v1/batches", batchesRouter)
+  -router.use("/v1/domains", domainsRouter)
+  -router.use("/v1/contacts", contactsRouter)
+  -router.use("/v1/exports", exportsRouter)
+  -router.use("/v1/reports", reportsRouter)
+  -router.use("/v1/admin", adminRouter)
+  +router.use("/auth", authRouter)
+  +router.use("/batches", batchesRouter)
+  +router.use("/domains", domainsRouter)
+  +router.use("/contacts", contactsRouter)
+  +router.use("/exports", exportsRouter)
+  +router.use("/reports", reportsRouter)
+  +router.use("/admin", adminRouter)
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/knexfile.js:8apps/api/knexfile.js:8-13]8;;
+
+  Add validation for required database environment variables.
+
+  The configuration reads DB_HOST, DB_PORT, DB_USER, DB_PASSWORD,
+  and DB_NAME from process.env without validating they exist or have
+  valid values. If any are missing or DB_PORT is not a valid number, Knex
+  will fail at connection time with unclear errors.
+
+
+
+
+
+  ✅ Proposed validation
+
+   const path = require("path")
+   const { loadEnv, findMonorepoRoot } = require("@repo/config/loadEnv")
+  
+   loadEnv({ rootDir: findMonorepoRoot(__dirname) })
+  
+  +const requiredEnvVars = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME"]
+  +requiredEnvVars.forEach((varName) => {
+  +  if (!process.env[varName]) {
+  +    throw new Error(`Missing required environment variable: ${varName}`)
+  +  }
+  +})
+  +
+  +const port = Number(process.env.DB_PORT || 3306)
+  +if (isNaN(port) || port <= 0) {
+  +  throw new Error(`Invalid DB_PORT: ${process.env.DB_PORT}`)
+  +}
+  +
+   module.exports = {
+     client: "mysql2",
+     connection: {
+       host: process.env.DB_HOST,
+  -    port: Number(process.env.DB_PORT),
+  +    port,
+       user: process.env.DB_USER,
+       password: process.env.DB_PASSWORD,
+       database: process.env.DB_NAME,
+     },
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/middleware/error.middleware.js:5apps/api/src/middleware/error.middleware.js:5]8;;
+
+  Direct process.env access violates coding guidelines.
+
+  Line 5 reads process.env.NODE_ENV directly, which violates the coding
+  guideline. As per coding guidelines, code MUST NOT read process.env.
+  outside packages/config and apps//config/ — use the validated env
+  export from ./config/env instead.
+
+
+
+
+
+  ♻️ Proposed fix to use validated env
+
+  +const { env } = require("../config/env")
+  +
+   const errorMiddleware = (err, _req, res, _next) => {
+     const status = err.status || 500
+     const message = err.message || "Internal Server Error"
+   
+  -  if (process.env.NODE_ENV !== "production") {
+  +  if (env.NODE_ENV !== "production") {
+       console.error("[api] error:", err.message)
+     }
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/components/ProtectedRoute.jsx:4apps/web/src/components/ProtectedRoute.jsx:4-9]8;;
+
+  Consider handling auth loading state and preserving redirect location.
+
+  The component immediately redirects when isAuthenticated is false, but
+  doesn't account for:
+  1. Auth initialization state (user may see a flash of the login page while
+  auth is loading)
+  2. Original location preservation (after login, user should return to the
+  attempted page)
+
+
+
+
+
+  🔄 Suggested enhancement
+
+  +import { Navigate, Outlet, useLocation } from "react-router-dom"
+   import { useAuth } from "../contexts/AuthContext"
+  
+   export const ProtectedRoute = () => {
+  -  const { isAuthenticated } = useAuth()
+  +  const { isAuthenticated, loading } = useAuth()
+  +  const location = useLocation()
+  +
+  +  if (loading) {
+  +    return null // or a loading spinner
+  +  }
+  +
+     if (!isAuthenticated) {
+  -    return <Navigate to="/login" replace />
+  +    return <Navigate to="/login" replace state={{ from: location }} />
+     }
+     return <Outlet />
+   }
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/auth.service.js:27apps/api/src/services/auth.service.js:27-31]8;;
+
+  JWT secret fallback is a critical security risk.
+
+  Line 29 uses a hardcoded development secret as fallback when JWT_SECRET
+  is not configured. This creates a critical security vulnerability if the
+  service runs in production without the environment variable set, as tokens
+  could be forged using the publicly visible fallback secret.
+
+
+
+
+
+  🔒 Proposed fix to require explicit JWT_SECRET
+
+  In apps/api/src/config/env.js, ensure JWT_SECRET validation throws an
+  error if not set:
+
+  // In env.js validation
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET environment variable is required")
+  }
+
+  Then remove the fallback:
+
+     const accessToken = jwt.sign(
+       { id: user.id, email: user.email, role: user.role },
+  -    env.JWT_SECRET || "dev-change-me-to-at-least-32-random-chars",
+  +    env.JWT_SECRET,
+       { expiresIn: "8h" }
+     )
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/migrations/20250608000002_seed_defaults.js:41apps/api/migrations/20250608000002_seed_defaults.js:41-46]8;;
+
+  Sequential inserts create N+1 pattern for settings seed.
+
+  The loop executes individual INSERT statements sequentially (lines
+  41-46), causing N round-trips to the database. For 5 settings this is
+  minor, but the pattern should use batch insert or a single transaction.
+
+
+
+
+
+  ⚡ Use batch upsert
+
+  -  for (const setting of settings) {
+  -    const row = await knex("app_settings").where({ key: setting.key }).first()
+  -    if (!row) {
+  -      await knex("app_settings").insert(setting)
+  -    }
+  -  }
+  +  // MySQL/PostgreSQL upsert
+  +  await knex("app_settings")
+  +    .insert(settings)
+  +    .onConflict("key")
+  +    .ignore()
+
+  Or if onConflict is not supported in your Knex/DB version:
+
+  +  const existingKeys = await knex("app_settings")
+  +    .whereIn("key", settings.map(s => s.key))
+  +    .pluck("key")
+  +  const newSettings = settings.filter(s => !existingKeys.includes(s.key))
+  +  if (newSettings.length > 0) {
+  +    await knex("app_settings").insert(newSettings)
+  +  }
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/utils/domainNormalizer.js:3apps/api/src/utils/domainNormalizer.js:3-11]8;;
+
+  Strengthen IP address validation regex.
+
+  The regex /^\d{1,3}(\.\d{1,3}){3}$/ on line 4 accepts invalid IP
+  addresses like 999.999.999.999 because it only checks for 1-3 digits per
+  octet without validating the range 0-255. While the URL parser will likely
+  reject these later, the isPrivateIp function could incorrectly classify
+  malformed inputs.
+
+
+
+
+  🔧 Proposed fix to validate IP octets properly
+
+   const isPrivateIp = (host) => {
+     if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false
+     const parts = host.split(".").map(Number)
+  +  if (parts.some(p => p > 255)) return false
+     if (parts[0] === 10) return true
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/reports.routes.js:23apps/api/src/routes/reports.routes.js:23-33]8;;
+
+  Remove redundant try-catch inside asyncHandler.
+
+  Same issue as the previous endpoint: the asyncHandler middleware on line
+  25 already catches async errors, making the explicit try-catch on lines
+  26-31 redundant.
+
+
+
+
+  ♻️ Proposed refactor to remove redundant try-catch
+
+   reportsRouter.get(
+     "/batch/:batchId/audit-logs",
+     asyncHandler(async (req, res) => {
+  -    try {
+  -      const data = await getAuditLogs(Number(req.params.batchId), req.user.id, req.query)
+  -      return success(res, data)
+  -    } catch (err) {
+  -      return error(res, err.code || "ERROR", err.message, err.status || 500)
+  -    }
+  +    const data = await getAuditLogs(Number(req.params.batchId), req.user.id, req.query)
+  +    return success(res, data)
+     })
+   )
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/middleware/auth.middleware.js:13apps/api/src/middleware/auth.middleware.js:13]8;;
+
+  Remove the hardcoded fallback secret.
+
+  The fallback "dev-change-me-to-at-least-32-random-chars" creates a
+  critical security vulnerability. If env.JWT_SECRET is not configured,
+  the application should fail to start or reject authentication, not fall
+  back to a predictable, hardcoded value that attackers could exploit to
+  forge tokens.
+
+
+
+
+  🔒 Proposed fix to enforce JWT_SECRET requirement
+
+  -    const payload = jwt.verify(token, env.JWT_SECRET || "dev-change-me-to-at-least-32-random-chars")
+  +    if (!env.JWT_SECRET) {
+  +      throw new Error("JWT_SECRET is not configured")
+  +    }
+  +    const payload = jwt.verify(token, env.JWT_SECRET)
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/reports.routes.js:27apps/api/src/routes/reports.routes.js:27]8;;
+
+  Validate that batchId is a valid number.
+
+  Same issue as line 15: Number(req.params.batchId) can return NaN. Add
+  validation before passing to the service layer.
+
+
+
+
+  🛡️ Proposed fix to validate batchId
+
+  -    const data = await getAuditLogs(Number(req.params.batchId), req.user.id, req.query)
+  +    const batchId = Number(req.params.batchId)
+  +    if (!Number.isInteger(batchId) || batchId <= 0) {
+  +      return error(res, "INVALID_INPUT", "Invalid batch ID", 400)
+  +    }
+  +    const data = await getAuditLogs(batchId, req.user.id, req.query)
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/auth.routes.js:15apps/api/src/routes/auth.routes.js:15-20]8;;
+
+  Redundant try/catch inside asyncHandler.
+
+  The asyncHandler middleware already catches and forwards any rejected
+  promises to Express error handling. The explicit try/catch block on lines
+  15-20 is unnecessary because asyncHandler will catch any error thrown by
+  login().
+
+
+
+
+
+  ♻️ Simplified version
+
+    asyncHandler(async (req, res) => {
+      const { email, password } = req.body || {}
+      if (!email || !password) {
+        return error(res, "VALIDATION_ERROR", "Email and password are required", 400)
+      }
+  -    try {
+  -      const data = await login(email, password)
+  -      return success(res, data)
+  -    } catch (err) {
+  -      return error(res, err.code || "AUTH_ERROR", err.message, err.status || 401)
+  -    }
+  +    const data = await login(email, password)
+  +    return success(res, data)
+    })
+
+  Note: This assumes login() throws errors with appropriate properties,
+  which asyncHandler will catch and forward to error middleware.
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/contexts/AuthContext.jsx:17apps/web/src/contexts/AuthContext.jsx:17-18]8;;
+
+  Token storage in localStorage presents XSS vulnerability surface.
+
+  Storing authentication tokens in localStorage exposes them to any XSS
+  attack. If an attacker injects malicious JavaScript, they can exfiltrate
+  the token via localStorage.getItem("access_token"). Consider using
+  httpOnly cookies for token storage if the API supports it, or document the
+  XSS mitigation strategy (CSP headers, input sanitization).
+
+
+
+  This is a common pattern but should be reviewed as part of the overall
+  security posture. As per coding guidelines: "Flag new cryptographic
+  primitive usage for security review".
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/reports.routes.js:15apps/api/src/routes/reports.routes.js:15]8;;
+
+  Validate that batchId is a valid number.
+
+  Number(req.params.batchId) can return NaN if the parameter is not
+  numeric. Passing NaN to the service layer could lead to unexpected
+  database behavior or unclear error messages.
+
+
+
+
+  🛡️ Proposed fix to validate batchId
+
+  -    const data = await getBatchReport(Number(req.params.batchId), req.user.id)
+  +    const batchId = Number(req.params.batchId)
+  +    if (!Number.isInteger(batchId) || batchId <= 0) {
+  +      return error(res, "INVALID_INPUT", "Invalid batch ID", 400)
+  +    }
+  +    const data = await getBatchReport(batchId, req.user.id)
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/settings.service.js:4apps/api/src/services/settings.service.js:4-20]8;;
+
+  Missing error handling for async database operations.
+
+  Both getSettings and updateSettings perform async database queries
+  without try-catch blocks. Database errors will crash the service or
+  propagate uncaught rejections.
+
+
+
+
+  🛡️ Proposed fix to add error handling
+
+   const getSettings = async () => {
+  +  try {
+       const rows = await db("app_settings").select("key", "value")
+       const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+       
+       return {
+         worker_count: map.worker_count ?? env.WORKER_COUNT,
+         source_timeouts: map.source_timeouts ?? {
+           snov: env.BROWSER_TIMEOUT,
+           apollo: env.BROWSER_TIMEOUT,
+           linkedin: env.BROWSER_TIMEOUT,
+           website: 20000,
+         },
+         retry_backoff_seconds: map.retry_backoff_seconds ?? env.RETRY_BACKOFF_SECONDS.split(",").map(Number),
+         proxy_enabled: map.proxy_enabled ?? env.PROXY_ENABLED,
+         headless: map.headless ?? env.HEADLESS,
+       }
+  +  } catch (error) {
+  +    throw new Error(`Failed to fetch settings: ${error.message}`)
+  +  }
+   }
+
+  Apply similar wrapping to updateSettings.
+
+
+  As per coding guidelines: "MUST handle async errors with try/catch or
+  equivalent".
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/settings.service.js:14apps/api/src/services/settings.service.js:14]8;;
+
+  Hardcoded timeout value lacks documentation.
+
+  The website timeout is hardcoded to 20000 ms without explanation. This
+  should either come from an environment variable or include a comment
+  explaining why this value differs from the browser timeout.
+
+
+
+
+  📝 Suggested fix
+
+         source_timeouts: map.source_timeouts ?? {
+           snov: env.BROWSER_TIMEOUT,
+           apollo: env.BROWSER_TIMEOUT,
+           linkedin: env.BROWSER_TIMEOUT,
+  -        website: 20000,
+  +        website: env.WEBSITE_TIMEOUT || 20000, // Default: 20s for direct website scraping
+         },
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/contexts/AuthContext.jsx:7apps/web/src/contexts/AuthContext.jsx:7-10]8;;
+
+  JSON.parse without error handling will crash on corrupted localStorage.
+
+  If the user value in localStorage contains invalid JSON (due to manual
+  editing, corruption, or browser quirks), JSON.parse will throw an
+  uncaught exception during React initialization, breaking the entire
+  application.
+
+
+
+
+  🛡️ Proposed fix to add error handling
+
+     const [user, setUser] = useState(() => {
+       const raw = localStorage.getItem("user")
+  -    return raw ? JSON.parse(raw) : null
+  +    if (!raw) return null
+  +    try {
+  +      return JSON.parse(raw)
+  +    } catch (error) {
+  +      console.warn("Failed to parse user from localStorage, clearing:", error)
+  +      localStorage.removeItem("user")
+  +      localStorage.removeItem("access_token")
+  +      return null
+  +    }
+     })
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/settings.service.js:31apps/api/src/services/settings.service.js:31-39]8;;
+
+  N+1 query pattern detected in settings update loop.
+
+  The loop performs individual SELECT, UPDATE, or INSERT queries for each
+  setting key. For N settings, this executes up to 2N database round-trips,
+  creating a performance bottleneck.
+
+
+
+
+  ⚡ Proposed fix using MySQL upsert
+
+  -  for (const [key, value] of entries) {
+  -    const serialized = JSON.stringify(value)
+  -    const existing = await db("app_settings").where({ key }).first()
+  -    if (existing) {
+  -      await db("app_settings").where({ key }).update({ value: serialized, updated_at: db.fn.now() })
+  -    } else {
+  -      await db("app_settings").insert({ key, value: serialized })
+  -    }
+  -  }
+  +  const now = new Date()
+  +  await db.raw(
+  +    `INSERT INTO app_settings (key, value, updated_at) VALUES ?
+  +     ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)`,
+  +    [entries.map(([key, value]) => [key, JSON.stringify(value), now])]
+  +  )
+
+  As per coding guidelines: "Flag obvious N+1 queries, full-table scans, or
+  unbounded loops introduced by the PR — Should severity".
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/domains.routes.js:15apps/api/src/routes/domains.routes.js:15]8;;
+
+  Validate route parameters before type coercion.
+
+  All three handlers coerce req.params.* to Number() without validating
+  that the parameter is actually numeric. Invalid input will produce NaN,
+  leading to unpredictable query behavior or database errors.
+
+  As per coding guidelines, routes must validate all input at the boundary
+  before domain logic.
+
+
+
+
+
+  🛡️ Proposed fix: validate params before Number() conversion
+
+   domainsRouter.get(
+     "/batch/:batchId",
+     asyncHandler(async (req, res) => {
+  +    const batchId = parseInt(req.params.batchId, 10)
+  +    if (!batchId || batchId < 1) {
+  +      return error(res, "INVALID_PARAM", "batchId must be a positive integer", 400)
+  +    }
+  -    const data = await listBatchDomains(Number(req.params.batchId), req.user.id, req.query)
+  +    const data = await listBatchDomains(batchId, req.user.id, req.query)
+       return success(res, data)
+     })
+   )
+
+  Apply similar validation to :domainId in the other two routes.
+
+
+
+  Also applies to: 27-27, 39-39
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/scripts/init-db.js:20apps/api/scripts/init-db.js:20-34]8;;
+
+  Database connection may leak if an error occurs mid-execution.
+
+  If an exception is thrown between creating the connection (line 20) and
+  closing it (line 34), the connection will not be properly released.
+
+
+
+
+  ♻️ Proposed fix using try/finally
+
+     console.log(`[db:init] Connecting to MySQL at ${host}:${port} as ${user}`)
+     
+     const connection = await mysql.createConnection({ host, port, user, password })
+  +  
+  +  try {
+  +    const [rows] = await connection.execute(
+  +      "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?",
+  +      [database]
+  +    )
+     
+  -  const [rows] = await connection.execute(
+  -    "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?",
+  -    [database]
+  -  )
+  -
+  -  if (rows.length === 0) {
+  -    await connection.execute(`CREATE DATABASE \`${database}\``)
+  -    console.log(`[db:init] Created database ${database}`)
+  -  } else {
+  -    console.log(`[db:init] Database ${database} already exists`)
+  +    if (rows.length === 0) {
+  +      await connection.execute(`CREATE DATABASE \`${database}\``)
+  +      console.log(`[db:init] Created database ${database}`)
+  +    } else {
+  +      console.log(`[db:init] Database ${database} already exists`)
+  +    }
+  +  } finally {
+  +    await connection.end()
+     }
+  -
+  -  await connection.end()
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/components/ExportActions/ExportActions.jsx:18apps/web/src/components/ExportActions/ExportActions.jsx:18-39]8;;
+
+  Replace hardcoded 2-second delay with polling or SSE.
+
+  The export initiates on line 13, then unconditionally waits 2 seconds
+  (line 18) before attempting download. This is a race condition: fast
+  exports waste time, slow exports fail with "queued" message and require
+  manual retry.
+
+
+
+
+  Consider polling the export status endpoint with exponential backoff, or
+  use server-sent events to notify when the export is ready. A fixed delay
+  is unreliable for production workloads.
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/reports.routes.js:11apps/api/src/routes/reports.routes.js:11-21]8;;
+
+  Remove redundant try-catch inside asyncHandler.
+
+  The asyncHandler middleware on line 13 already catches and forwards
+  async errors to Express error handling. The explicit try-catch on lines
+  14-19 is redundant and adds unnecessary nesting.
+
+
+
+
+  ♻️ Proposed refactor to remove redundant try-catch
+
+   reportsRouter.get(
+     "/batch/:batchId",
+     asyncHandler(async (req, res) => {
+  -    try {
+  -      const data = await getBatchReport(Number(req.params.batchId), req.user.id)
+  -      return success(res, data)
+  -    } catch (err) {
+  -      return error(res, err.code || "ERROR", err.message, err.status || 500)
+  -    }
+  +    const data = await getBatchReport(Number(req.params.batchId), req.user.id)
+  +    return success(res, data)
+     })
+   )
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/scripts/init-db.js:28apps/api/scripts/init-db.js:28]8;;
+
+  SQL injection risk: database name uses string interpolation.
+
+  The CREATE DATABASE statement uses template literal interpolation with
+  the database name from environment variables. While the immediate risk is
+  low (value comes from env, not user input), this pattern is vulnerable if
+  the env var is ever influenced by external input or contains malicious
+  characters like backticks or SQL keywords.
+
+
+
+
+  🛡️ Proposed fix to validate database name
+
+  +  // Validate database name to prevent SQL injection
+  +  if (!/^[a-zA-Z0-9_]+$/.test(database)) {
+  +    throw new Error(`Invalid database name: ${database}. Must contain only alphanumeric characters and underscores.`)
+  +  }
+  +
+     if (rows.length === 0) {
+       await connection.execute(`CREATE DATABASE \`${database}\``)
+
+  Alternatively, use a safer approach:
+
+     if (rows.length === 0) {
+  -    await connection.execute(`CREATE DATABASE \`${database}\``)
+  +    await connection.query("CREATE DATABASE ??", [database])
+
+  Note: MySQL's ?? placeholder is for identifiers (table/database names),
+  while ? is for values.
+
+
+  As per coding guidelines: "Use parameterized database queries to prevent
+  SQL injection".
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/components/ExportActions/ExportActions.jsx:20apps/web/src/components/ExportActions/ExportActions.jsx:20-24]8;;
+
+  Fix URL construction bug causing double /api prefix.
+
+  Line 23 constructs the download URL as ` ${base.replace(/\/$/,
+  "")}/api/v1/exports/... . When base is /api` (the default fallback
+  on line 20), this produces /api/api/v1/exports/..., which will 404.
+
+  Per coding guidelines, API paths must use /api/... format and frontend
+  endpoints passed to apiFetch already include /api. The download
+  endpoint should not prepend /api again.
+
+
+
+
+
+  🐛 Proposed fix for URL construction
+
+  -          const base = typeof __API_BASE_URL__ !== "undefined" ? __API_BASE_URL__ : "/api"
+  +          const base = typeof __API_BASE_URL__ !== "undefined" ? __API_BASE_URL__ : ""
+             const token = localStorage.getItem("access_token")
+             const downloadRes = await fetch(
+  -            `${base.replace(/\/$/, "")}/api/v1/exports/${exportId}/download`,
+  +            `${base}/api/v1/exports/${exportId}/download`,
+               { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+             )
+
+  This ensures the full path is /api/v1/exports/{id}/download in local dev
+  and /{PUBLIC_PATH}/api/v1/exports/{id}/download in production.
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/components/ContactsTable/ContactsTable.jsx:27apps/web/src/components/ContactsTable/ContactsTable.jsx:27]8;;
+
+  Validate date before formatting to prevent Invalid Date display.
+
+  new Date(c.discovered_at).toLocaleString() will display "Invalid Date"
+  if discovered_at is malformed. Consider defensive formatting:
+
+
+
+
+
+  🛡️ Safer date formatting
+
+  -              <td className="px-4 py-3">{c.discovered_at ? new Date(c.discovered_at).toLocaleString() : "—"}</td>
+  +              <td className="px-4 py-3">
+  +                {c.discovered_at ? (() => {
+  +                  const d = new Date(c.discovered_at)
+  +                  return isNaN(d.getTime()) ? "—" : d.toLocaleString()
+  +                })() : "—"}
+  +              </td>
+
+  Or extract to a helper function for reusability.
+
+
+────────────────────────────────────────────────────────────────────────
+  major [refactor_suggestion]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/domains.routes.js:11apps/api/src/routes/domains.routes.js:11-21]8;;
+
+  Remove redundant try/catch blocks inside asyncHandler.
+
+  All three route handlers wrap their logic in both asyncHandler and an
+  internal try/catch. The asyncHandler middleware already catches and
+  forwards async errors to the global error handler, making the inner
+  try/catch redundant. This violates DRY and bypasses centralized error
+  handling.
+
+
+
+
+
+  ♻️ Proposed refactor to remove redundant error handling
+
+   domainsRouter.get(
+     "/batch/:batchId",
+     asyncHandler(async (req, res) => {
+  -    try {
+  -      const data = await listBatchDomains(Number(req.params.batchId), req.user.id, req.query)
+  -      return success(res, data)
+  -    } catch (err) {
+  -      return error(res, err.code || "ERROR", err.message, err.status || 500)
+  -    }
+  +    const data = await listBatchDomains(Number(req.params.batchId), req.user.id, req.query)
+  +    return success(res, data)
+     })
+   )
+
+  Apply the same pattern to the other two routes. Let the global error
+  middleware in error.middleware.js handle error responses uniformly.
+
+
+
+  Also applies to: 23-33, 35-45
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/config/env.js:10apps/api/src/config/env.js:10]8;;
+
+  CORS_ORIGIN wildcard exposes API to cross-origin attacks.
+
+  The default CORS_ORIGIN: "" allows any website to make authenticated
+  requests to this API, bypassing same-origin policy protections. This
+  violates the coding guideline: "Flag new CORS rules or
+  Access-Control-Allow-Origin:  for security review."
+
+
+
+
+
+  🔒 Proposed fix: restrict CORS to known origins
+
+   const appEnvSchema = Joi.object({
+  -  CORS_ORIGIN: Joi.string().default("*"),
+  +  CORS_ORIGIN: Joi.string().required(),
+   }).unknown(true)
+
+  Then add to .env.example and production config:
+
+  CORS_ORIGIN=https://yourdomain.com,https://app.yourdomain.com
+
+  Update CORS middleware in app.js to parse comma-separated origins and
+  validate each request's Origin header against the allowlist.
+
+
+  As per coding guidelines, flag new CORS rules or
+  Access-Control-Allow-Origin: * for security review.
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/report.service.js:61apps/api/src/services/report.service.js:61-74]8;;
+
+  Validate and sanitize filter inputs before query.
+
+  The filters object is destructured and applied directly to the query
+  without validation. Malicious or malformed input (e.g., SQL injection via
+  source, unbounded limit, invalid date strings) could corrupt the query
+  or cause performance issues.
+
+  Per coding guidelines, routes must validate all input at the boundary.
+
+
+
+
+
+  🛡️ Proposed validation using Joi
+
+  +const Joi = require("joi")
+  +
+  +const auditLogFilterSchema = Joi.object({
+  +  domain_id: Joi.number().integer().positive().optional(),
+  +  source: Joi.string().max(50).optional(),
+  +  status: Joi.string().max(20).optional(),
+  +  from: Joi.date().iso().optional(),
+  +  to: Joi.date().iso().min(Joi.ref("from")).optional(),
+  +  page: Joi.number().integer().min(1).default(1),
+  +  limit: Joi.number().integer().min(1).max(100).default(50),
+  +})
+  +
+   const getAuditLogs = async (batchId, userId, filters = {}) => {
+     const batch = await db("batches").where({ id: batchId, user_id: userId }).first()
+     if (!batch) {
+       const err = new Error("Batch not found")
+       err.status = 404
+       err.code = "NOT_FOUND"
+       throw err
+     }
+   
+  +  const { error, value } = auditLogFilterSchema.validate(filters)
+  +  if (error) {
+  +    const err = new Error(`Invalid filters: ${error.message}`)
+  +    err.status = 400
+  +    err.code = "INVALID_INPUT"
+  +    throw err
+  +  }
+  +
+  -  const { domain_id, source, status, from, to, page = 1, limit = 50 } = filters
+  +  const { domain_id, source, from, to, page, limit } = value
+     const offset = (page - 1) * limit
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/report.service.js:47apps/api/src/services/report.service.js:47]8;;
+
+  Remove hardcoded fake average_processing_time.
+
+  Line 47 returns a hardcoded 45 seconds when processed > 0, which is
+  not actual data. This will mislead users and break reporting accuracy in
+  production.
+
+
+
+
+
+  🐛 Proposed fix: calculate real average or remove the field
+
+  Option 1: Calculate from actual timestamps in the database:
+
+  +  const avgTime = processed > 0
+  +    ? await db("domains")
+  +        .where({ batch_id: batchId, status: "completed" })
+  +        .avg(db.raw("TIMESTAMPDIFF(SECOND, created_at, updated_at) as duration"))
+  +        .first()
+  +    : { duration: 0 }
+  +
+     return {
+       ...
+  -    average_processing_time_seconds: processed > 0 ? 45 : 0,
+  +    average_processing_time_seconds: Math.round(avgTime.duration || 0),
+       domain_status_breakdown: domainStats,
+     }
+
+  Option 2: Remove the field entirely if tracking isn't implemented yet and
+  document in a TODO.
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/utils/contactRanker.js:20apps/api/src/utils/contactRanker.js:20-26]8;;
+
+  Simplify the slice expression in selectTopContacts.
+
+  Line 25 uses a complex expression that reduces to `sorted.slice(0,
+  minCount) in practice. The nested Math.max, Math.min`, and ternary are
+  unnecessary because slice safely handles cases where minCount exceeds
+  the array length.
+
+
+
+
+  ♻️ Proposed refactor
+
+   const selectTopContacts = (contacts, minCount = 2) => {
+     const sorted = [...contacts].sort((a, b) => {
+       if (a.rank_score !== b.rank_score) return a.rank_score - b.rank_score
+       return new Date(a.discovered_at) - new Date(b.discovered_at)
+     })
+  -  return sorted.slice(0, Math.max(minCount, sorted.length > 0 ? Math.min(minCount, sorted.length) : 0))
+  +  return sorted.slice(0, minCount)
+   }
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/scripts/preview-stop.js:48scripts/preview-stop.js:48-54]8;;
+
+  Platform-specific command: fuser is Linux-only.
+
+  The fuser command is not available on macOS or Windows. For
+  cross-platform port cleanup, consider using lsof on macOS or a Node.js
+  library like kill-port.
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/exports.routes.js:44apps/api/src/routes/exports.routes.js:44-46]8;;
+
+  Replace synchronous fs.existsSync with async alternative or remove the
+  check.
+
+  fs.existsSync blocks the event loop. Since res.download already
+  handles missing files gracefully by returning an error, the explicit check
+  is redundant. Remove it or use fs.promises.access() if you need a custom
+  404 response.
+
+
+
+
+  🔄 Proposed fix
+
+  Option 1 (preferred): Remove the check and let res.download handle
+  missing files:
+
+  -      if (!fs.existsSync(filePath)) {
+  -        return error(res, "NOT_FOUND", "Export file missing", 404)
+  -      }
+         return res.download(filePath, fileName)
+
+  Option 2: Use async fs.promises.access:
+
+  +      const fs = require("fs").promises
+         const { path: filePath, fileName } = await getExportDownloadPath(
+           Number(req.params.exportId),
+           req.user.id
+         )
+  -      if (!fs.existsSync(filePath)) {
+  +      try {
+  +        await fs.access(filePath)
+  +      } catch {
+           return error(res, "NOT_FOUND", "Export file missing", 404)
+         }
+  +      }
+         return res.download(filePath, fileName)
+
+  Based on learnings: "Avoid synchronous blocking operations in JavaScript"
+
+
+────────────────────────────────────────────────────────────────────────
+  major [refactor_suggestion]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/migrations/20250608000001_initial_schema.js:14apps/api/migrations/20250608000001_initial_schema.js:14-32]8;;
+
+  Add index on batches.user_id for better query performance.
+
+  The user_id column is a foreign key to users but has no index. Queries
+  that fetch a user's batches (WHERE user_id = ?) will require a table
+  scan. Add an index to optimize this common query pattern.
+
+
+
+
+  📊 Proposed fix
+
+     await knex.schema.createTable("batches", (table) => {
+       table.bigIncrements("id").primary()
+       table.bigInteger("user_id").unsigned().notNullable().references("id").inTable("users")
+  +    table.index(["user_id"], "idx_batches_user")
+       table.string("original_file_name", 255).notNullable()
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/worker.service.js:119apps/api/src/services/worker.service.js:119-142]8;;
+
+  N+1 query: batch status checked once per domain.
+
+  Lines 120-121 fetch the batch record inside the domain-processing loop to
+  check if it's paused or cancelled. For a batch with 1,000 domains, this
+  executes 1,000 identical SELECT queries. Consider checking the batch
+  status every N domains (e.g., every 10) or implementing a signal-based
+  mechanism to detect pause/cancel requests.
+
+
+
+
+  🔧 Proposed fix (poll every 10 domains)
+
+  +  let processedCount = 0
+     for (const domainRow of domains) {
+  -    const current = await db("batches").where({ id: batchId }).first()
+  -    if (!current || current.status === "paused" || current.status === "cancelled") break
+  +    if (processedCount % 10 === 0) {
+  +      const current = await db("batches").where({ id: batchId }).first()
+  +      if (!current || current.status === "paused" || current.status === "cancelled") break
+  +    }
+  
+       try {
+         const result = await processDomain(domainRow, batchId, minContacts)
+         processed += 1
+  +      processedCount += 1
+         contactsFound += result.contactsFound
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/contact.service.js:41apps/api/src/services/contact.service.js:41]8;;
+
+  COUNT query does not match filter criteria.
+
+  The total count uses WHERE batch_id only, but the main query applies
+  additional filters (source, priority_level, domain, has_email).
+  This causes incorrect pagination totals when filters are active.
+
+
+
+
+  🔧 Apply filters to COUNT query
+
+  -  const items = await query.limit(limit).offset(offset)
+  -  const [{ count }] = await db("contacts").where({ batch_id: batchId }).count({ count: "*" })
+  +  const items = await query.clone().limit(limit).offset(offset)
+  +  const [{ count }] = await query.clone().clearSelect().clearOrder().count({ count: "*" })
+
+  This reuses the filtered query for the count, ensuring totals reflect the
+  active filters.
+
+
+────────────────────────────────────────────────────────────────────────
+  major [refactor_suggestion]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/contacts.routes.js:13apps/api/src/routes/contacts.routes.js:13-20]8;;
+
+  Remove redundant try-catch inside asyncHandler.
+
+  The route is already wrapped in asyncHandler (line 13), which catches
+  async errors. The inner try-catch at lines 14-20 is redundant and prevents
+  the error middleware from handling exceptions consistently.
+
+
+
+
+  ♻️ Simplify error handling
+
+   contactsRouter.get(
+     "/batch/:batchId",
+     asyncHandler(async (req, res) => {
+  -    try {
+  -      const data = await listBatchContacts(Number(req.params.batchId), req.user.id, req.query)
+  -      return success(res, data)
+  -    } catch (err) {
+  -      return error(res, err.code || "ERROR", err.message, err.status || 500)
+  -    }
+  +    const data = await listBatchContacts(Number(req.params.batchId), req.user.id, req.query)
+  +    return success(res, data)
+     })
+   )
+
+  Let asyncHandler and the error middleware handle exceptions thrown by
+  listBatchContacts.
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/pages/BatchDetailPage/BatchDetailPage.jsx:26apps/web/src/pages/BatchDetailPage/BatchDetailPage.jsx:26-30]8;;
+
+  Add load to the useEffect dependency array.
+
+  The effect calls load() but does not list it as a dependency. This
+  violates React's exhaustive-deps rule and can cause stale closures. As per
+  coding guidelines, ensure proper useEffect dependency arrays in React.
+
+
+
+
+  🔧 Fix dependency array
+
+  Wrap load in useCallback and add it to the dependency array:
+
+  +import { useEffect, useState, useCallback } from "react"
+  ...
+  -  const load = async () => {
+  +  const load = useCallback(async () => {
+       try {
+         const [batchRes, domainsRes] = await Promise.all([
+           apiFetch(`/api/v1/batches/${batchId}`),
+           apiFetch(`/api/v1/batches/${batchId}/domains?limit=20`),
+         ])
+         setBatch(batchRes.data)
+         setDomains(domainsRes.data.items || [])
+       } catch (err) {
+         setError(err.message)
+       }
+  -  }
+  +  }, [batchId])
+  
+     useEffect(() => {
+       load()
+       const interval = setInterval(load, 5000)
+       return () => clearInterval(interval)
+  -  }, [batchId])
+  +  }, [load])
+
+
+────────────────────────────────────────────────────────────────────────
+  major [refactor_suggestion]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/export.service.js:121apps/api/src/services/export.service.js:121-135]8;;
+
+  Eliminate redundant database query for storage_key.
+
+  Line 130 fetches storage_key in a separate query, but getExport (line
+  103) already queries the exports table. Include storage_key in the
+  SELECT at line 106 to avoid the extra round-trip.
+
+
+
+
+  ♻️ Include storage_key in getExport SELECT
+
+  At line 106, add storage_key to the selected columns:
+
+     const row = await db("exports as e")
+       .join("batches as b", "b.id", "e.batch_id")
+  -    .select("e.id", "e.batch_id", "e.format", "e.status", "e.file_name", "e.error_message", "e.completed_at")
+  +    .select("e.id", "e.batch_id", "e.format", "e.status", "e.file_name", "e.storage_key", "e.error_message", "e.completed_at")
+       .where("e.id", exportId)
+
+  Then at line 130-132, use the value from row:
+
+  -  const storageKey = await db("exports").select("storage_key").where({ id: exportId }).first()
+     return {
+  -    path: path.join(UPLOAD_DIR, storageKey.storage_key),
+  +    path: path.join(UPLOAD_DIR, row.storage_key),
+       fileName: row.file_name,
+     }
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/routes/exports.routes.js:14apps/api/src/routes/exports.routes.js:14-21]8;;
+
+  Simplify error handling by removing redundant try/catch.
+
+  The asyncHandler wrapper already catches async errors and passes them to
+  the error middleware. The try/catch block inside the handler is redundant
+  unless the service intentionally throws errors with custom code and
+  status properties that must be mapped before middleware sees them. If
+  that's the case, consider moving the error mapping logic to the error
+  middleware instead.
+
+
+
+
+  ♻️ Proposed refactor
+
+   exportsRouter.post(
+     "/batch/:batchId",
+     asyncHandler(async (req, res) => {
+  -    try {
+  -      const data = await createExport(Number(req.params.batchId), req.user.id, req.body || {})
+  -      return success(res, data, "Export queued", 201)
+  -    } catch (err) {
+  -      return error(res, err.code || "ERROR", err.message, err.status || 500)
+  -    }
+  +    const data = await createExport(Number(req.params.batchId), req.user.id, req.body || {})
+  +    return success(res, data, "Export queued", 201)
+     })
+   )
+
+  Apply the same pattern to the other handlers (lines 26-33, 38-51).
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/export.service.js:92apps/api/src/services/export.service.js:92-97]8;;
+
+  Log the error before updating failure status.
+
+  The catch block updates the export status to failed but does not log the
+  error. As per coding guidelines, errors should be logged with context in
+  JavaScript.
+
+
+
+
+  🔍 Add error logging
+
+     setImmediate(() => {
+       generateExportFile(exportId, batchId, format).catch(async (err) => {
+  +      console.error(`[export] Failed export ${exportId}:`, err)
+         await db("exports").where({ id: exportId }).update({
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/contact.service.js:101apps/api/src/services/contact.service.js:101]8;;
+
+  SQL injection risk: parameterize the LIKE clause.
+
+  String interpolation in the LIKE predicate allows SQL injection. Use Knex
+  parameterized bindings instead. As per coding guidelines, reject
+  string-concatenated SQL and require parameterized queries.
+
+
+
+
+  🛡️ Use parameterized LIKE
+
+  -  if (domain) query = query.andWhere("domain", "like", `%${domain}%`)
+  +  if (domain) query = query.andWhere(db.raw("domain LIKE ?", [`%${domain}%`]))
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/contact.service.js:36apps/api/src/services/contact.service.js:36]8;;
+
+  SQL injection risk: parameterize the LIKE clause.
+
+  String interpolation in the LIKE predicate allows SQL injection. Use Knex
+  parameterized bindings instead. As per coding guidelines, reject
+  string-concatenated SQL and require parameterized queries.
+
+
+
+
+  🛡️ Use parameterized LIKE
+
+  -  if (domain) query = query.andWhere("c.domain", "like", `%${domain}%`)
+  +  if (domain) query = query.andWhere("c.domain", "like", `%${domain.replace(/[%_]/g, '\\$&')}%`)
+
+  Or better, use Knex's safer API:
+
+  -  if (domain) query = query.andWhere("c.domain", "like", `%${domain}%`)
+  +  if (domain) query = query.andWhere(db.raw("c.domain LIKE ?", [`%${domain}%`]))
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/pages/SettingsPage/SettingsPage.jsx:47apps/web/src/pages/SettingsPage/SettingsPage.jsx:47-55]8;;
+
+  Add Yup validation schema to the Formik form.
+
+  The form has validation needs (e.g., worker_count must be a positive
+  number, retry_backoff_seconds must be valid numbers), but no
+  validationSchema is defined. As per coding guidelines, Formik forms with
+  validation rules MUST use Yup.
+
+
+
+
+  ✅ Add Yup validation
+
+  Import Yup and define a schema:
+
+  -import { Formik, Form, Field } from "formik"
+  +import { Formik, Form, Field } from "formik"
+  +import * as Yup from "yup"
+   import { useEffect, useState } from "react"
+   import { apiFetch } from "../../lib/apiFetch"
+  
+  +const settingsSchema = Yup.object({
+  +  worker_count: Yup.number().required("Required").positive("Must be positive").integer("Must be an integer"),
+  +  proxy_enabled: Yup.string().oneOf(["true", "false"]),
+  +  headless: Yup.string().oneOf(["true", "false"]),
+  +  retry_backoff_seconds: Yup.string().test(
+  +    "valid-numbers",
+  +    "Must be comma-separated positive numbers",
+  +    (val) => !val || val.split(",").every((n) => !isNaN(Number(n.trim())) && Number(n.trim()) > 0)
+  +  ),
+  +})
+  +
+   export const SettingsPage = () => {
+     ...
+         <Formik
+           initialValues={{
+             worker_count: initial.worker_count,
+             proxy_enabled: String(initial.proxy_enabled),
+             headless: String(initial.headless),
+             retry_backoff_seconds: (initial.retry_backoff_seconds || []).join(", "),
+           }}
+  +        validationSchema={settingsSchema}
+           onSubmit={handleSubmit}
+         >
+
+  Display field errors using ` or errors/touched` from Formik.
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/packages/config/src/env.js:44packages/config/src/env.js:44]8;;
+
+  JWT_SECRET minimum length weaker than documented requirement.
+
+  Line 44 validates JWT_SECRET with .min(16), but the .env.example
+  comment (line 53-54) documents the requirement as "at least 32 random
+  chars." This inconsistency between schema validation and documentation
+  could allow weaker secrets in production.
+
+
+
+
+
+  🔐 Proposed fix to align with documented minimum
+
+  -  JWT_SECRET: Joi.string().min(16).allow("").optional(),
+  +  JWT_SECRET: Joi.string().min(32).allow("").optional(),
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/.env.example:17.env.example:17-27]8;;
+
+  BLOCKER: Real production credentials committed in .env.example.
+
+  Lines 18-27 contain what appear to be real service credentials for
+  Snov.io, Apollo, and LinkedIn (real email domains, realistic passwords).
+  Committing actual credentials in .env.example exposes them to anyone
+  with repository access and violates security best practices.
+
+  As per coding guidelines, .env.example must NOT commit real production
+  secrets — use documented placeholders or empty values with comments
+  instead.
+
+
+
+
+
+  🔒 Proposed fix to replace with placeholders
+
+  -# Snov.io credentials — set real values in .env for harvesting workers
+  -SNOV_EMAIL=n8n@identixweb.in
+  -SNOV_PASSWORD=Identixweb@99
+  +# Snov.io credentials — set real values in .env (not committed)
+  +SNOV_EMAIL=
+  +SNOV_PASSWORD=
+   
+  -# Apollo credentials
+  -APOLLO_EMAIL=n8n@identixweb.in
+  -APOLLO_PASSWORD=Identixweb@99
+  +# Apollo credentials — set real values in .env (not committed)
+  +APOLLO_EMAIL=
+  +APOLLO_PASSWORD=
+   
+  -# LinkedIn credentials
+  -LINKEDIN_EMAIL=n8n@elookinto.org
+  -LINKEDIN_PASSWORD=n8n@dev97
+  +# LinkedIn credentials — set real values in .env (not committed)
+  +LINKEDIN_EMAIL=
+  +LINKEDIN_PASSWORD=
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/packages/config/src/env.js:20packages/config/src/env.js:20]8;;
+
+  Hardcoded DB_NAME default prevents flexible database naming.
+
+  Line 20 sets a hardcoded default DB_NAME: "email_harvesting_app" in the
+  shared env.js schema. When multiple apps or environments share this
+  config package, they will all default to the same database name, creating
+  conflicts in shared MySQL instances.
+
+  As per coding guidelines, DB_NAME Joi default in shared env.js must
+  NOT hardcode one app's database name — prefer requiring it from .env or
+  .env.example as the source of truth for product-specific databases.
+
+
+
+
+
+  🗄️ Proposed fix to require DB_NAME from environment
+
+  -  DB_NAME: Joi.string().default("email_harvesting_app"),
+  +  DB_NAME: Joi.string().required(),
+
+  Ensure .env.example documents the expected value (already present on
+  line 15 of .env.example).
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/batch.service.js:93apps/api/src/services/batch.service.js:93-96]8;;
+
+  Pagination total count ignores status filter, breaking pagination
+  metadata.
+
+  Line 96 counts all batches for the user without applying the status
+  filter from line 93. When a status filter is active (e.g.,
+  ?status=completed), the returned total count includes batches of all
+  statuses, causing incorrect pagination metadata (e.g., showing "50 total"
+  when only 10 are completed).
+
+
+
+
+
+  🐛 Proposed fix to apply filter to count query
+
+     if (status) query = query.andWhere({ status })
+   
+     const rows = await query.limit(limit).offset(offset)
+  -  const [{ count }] = await db("batches").where({ user_id: userId }).count({ count: "*" })
+  +  
+  +  let countQuery = db("batches").where({ user_id: userId })
+  +  if (status) countQuery = countQuery.andWhere({ status })
+  +  const [{ count }] = await countQuery.count({ count: "*" })
+  +  
+     return { items: rows, page, limit, total: Number(count) }
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/pages/UploadBatchPage/UploadBatchPage.jsx:13apps/web/src/pages/UploadBatchPage/UploadBatchPage.jsx:13-35]8;;
+
+  Prefer apiFetch helper over manual fetch for upload request.
+
+  Lines 20-26 construct a manual fetch call with FormData, duplicating
+  the auth header logic already implemented in apiFetch (imported on line
+  4 but unused here). The apiFetch utility already handles FormData
+  bodies correctly (see apps/web/src/lib/apiFetch.js line 22), so using it
+  would reduce code duplication and maintain consistency across the
+  codebase.
+
+
+
+
+
+  ♻️ Proposed refactor to use apiFetch
+
+     const handleUpload = async () => {
+       if (!file) return
+       setUploading(true)
+       setError("")
+       try {
+         const formData = new FormData()
+         formData.append("file", file)
+  -      const base = getApiBase().replace(/\/$/, "")
+  -      const token = localStorage.getItem("access_token")
+  -      const res = await fetch(`${base}/api/v1/batches/upload`, {
+  +      const data = await apiFetch("/api/v1/batches/upload", {
+           method: "POST",
+  -        headers: token ? { Authorization: `Bearer ${token}` } : {},
+           body: formData,
+         })
+  -      const data = await res.json()
+  -      if (!res.ok) throw new Error(data?.error?.message || "Upload failed")
+         setResult(data.data)
+       } catch (err) {
+         setError(err.message)
+       } finally {
+         setUploading(false)
+       }
+     }
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/batch.service.js:23apps/api/src/services/batch.service.js:23-63]8;;
+
+  Missing database transaction for batch creation leaves partial state on
+  failure.
+
+  Lines 23-63 perform multiple database inserts (batches, batch_rows,
+  domains, audit_logs) without wrapping them in a transaction. If any
+  insert fails (e.g., domains insert on line 48), the earlier inserts
+  (batch record, batch_rows) remain committed, leaving orphaned data.
+  Additionally, the uploaded file (line 19) is not cleaned up on DB failure.
+
+  This violates reliability best practices: related operations should be
+  atomic.
+
+
+
+
+
+  🔄 Proposed fix wrapping inserts in a transaction
+
+   const createBatchFromUpload = async (userId, file) => {
+     ensureUploadDir()
+     const storageKey = `${Date.now()}-${file.originalname}`
+     const dest = path.join(UPLOAD_DIR, storageKey)
+     fs.renameSync(file.path, dest)
+   
+  -  const parsed = parseSpreadsheet(dest, file.originalname)
+  +  let parsed
+  +  try {
+  +    parsed = parseSpreadsheet(dest, file.originalname)
+  +  } catch (err) {
+  +    await fsPromises.unlink(dest) // Clean up file if parse fails
+  +    throw err
+  +  }
+   
+  -  const [batchId] = await db("batches").insert({
+  -    user_id: userId,
+  -    original_file_name: file.originalname,
+  -    file_storage_key: storageKey,
+  -    status: "queued",
+  -    total_rows: parsed.totalRows,
+  -    valid_domains: parsed.validDomains,
+  -    invalid_rows: parsed.invalidRows,
+  -  })
+  +  let batchId
+  +  try {
+  +    await db.transaction(async (trx) => {
+  +      ;[batchId] = await trx("batches").insert({
+  +        user_id: userId,
+  +        original_file_name: file.originalname,
+  +        file_storage_key: storageKey,
+  +        status: "queued",
+  +        total_rows: parsed.totalRows,
+  +        valid_domains: parsed.validDomains,
+  +        invalid_rows: parsed.invalidRows,
+  +      })
+   
+  -  if (parsed.rows.length) {
+  -    await db("batch_rows").insert(
+  -      parsed.rows.map((row) => ({
+  -        batch_id: batchId,
+  -        row_number: row.rowNumber,
+  -        store_url: row.storeUrl,
+  -        normalized_domain: row.normalizedDomain,
+  -        validation_status: row.validationStatus,
+  -        validation_error: row.validationError,
+  -      }))
+  -    )
+  -  }
+  +      if (parsed.rows.length) {
+  +        await trx("batch_rows").insert(
+  +          parsed.rows.map((row) => ({
+  +            batch_id: batchId,
+  +            row_number: row.rowNumber,
+  +            store_url: row.storeUrl,
+  +            normalized_domain: row.normalizedDomain,
+  +            validation_status: row.validationStatus,
+  +            validation_error: row.validationError,
+  +          }))
+  +        )
+  +      }
+   
+  -  const validDomains = parsed.rows.filter((r) => r.validationStatus === "valid")
+  -  if (validDomains.length) {
+  -    await db("domains").insert(
+  -      validDomains.map((row) => ({
+  -        batch_id: batchId,
+  -        store_url: row.storeUrl,
+  -        domain: row.normalizedDomain,
+  -        status: "queued",
+  -      }))
+  -    )
+  -  }
+  +      const validDomains = parsed.rows.filter((r) => r.validationStatus === "valid")
+  +      if (validDomains.length) {
+  +        await trx("domains").insert(
+  +          validDomains.map((row) => ({
+  +            batch_id: batchId,
+  +            store_url: row.storeUrl,
+  +            domain: row.normalizedDomain,
+  +            status: "queued",
+  +          }))
+  +        )
+  +      }
+   
+  -  await db("audit_logs").insert({
+  -    batch_id: batchId,
+  -    event_type: "BATCH_UPLOADED",
+  -    message: `Batch ${batchId} uploaded with ${parsed.validDomains} valid domains`,
+  -    details: JSON.stringify({ invalid_rows: parsed.invalidRows }),
+  -  })
+  +      await trx("audit_logs").insert({
+  +        batch_id: batchId,
+  +        event_type: "BATCH_UPLOADED",
+  +        message: `Batch ${batchId} uploaded with ${parsed.validDomains} valid domains`,
+  +        details: JSON.stringify({ invalid_rows: parsed.invalidRows }),
+  +      })
+  +    })
+  +  } catch (err) {
+  +    await fsPromises.unlink(dest) // Clean up file if DB transaction fails
+  +    throw err
+  +  }
+
+
+────────────────────────────────────────────────────────────────────────
+  trivial [nitpick]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/packages/config/src/env.js:11packages/config/src/env.js:11]8;;
+
+  Add format validation for PUBLIC_PATH to enforce leading slash.
+
+  Line 11 defines PUBLIC_PATH with only a default value. Per coding
+  guidelines, PUBLIC_PATH format must be a URL path prefix with a leading
+  slash (/, /myapp, /myapp/), and must NOT be a full origin URL.
+  Adding .pattern(/^\//) would enforce this constraint and prevent
+  configuration errors.
+
+
+
+
+
+  ✅ Proposed validation pattern
+
+  -  PUBLIC_PATH: Joi.string().default("/"),
+  +  PUBLIC_PATH: Joi.string().pattern(/^\//).default("/"),
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/lib/apiFetch.js:33apps/web/src/lib/apiFetch.js:33]8;;
+
+  Silent error swallowing in JSON parse fallback.
+
+  The .catch(() => ({})) silently ignores JSON parsing errors and returns
+  an empty object. If the server returns malformed JSON or a non-JSON
+  response, this masks the underlying issue and could lead to confusing
+  behavior (e.g., data?.error?.message evaluates to undefined when error
+  info might be in the response text).
+
+  As per coding guidelines, empty catch blocks that silently swallow errors
+  must be rejected.
+
+
+
+
+
+  🐛 Proposed fix to log parse errors
+
+  -  const data = await response.json().catch(() => ({}))
+  +  const data = await response.json().catch((err) => {
+  +    console.error("Failed to parse JSON response:", err)
+  +    return {}
+  +  })
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/batch.service.js:170apps/api/src/services/batch.service.js:170-174]8;;
+
+  Async processing error only logged; batch can be stuck in "processing"
+  forever.
+
+  Lines 171-173 invoke processBatchDomains(batchId) asynchronously and
+  catch errors only to log them. If processBatchDomains throws or rejects,
+  the batch remains in "processing" status indefinitely with no retry
+  mechanism or state update to mark it as "failed". Users have no
+  visibility into the failure.
+
+  This is a reliability gap: failed background processing should update
+  batch state or trigger alerts.
+
+
+
+
+
+  🔧 Proposed fix to update batch status on processing failure
+
+     if (action.to === "processing") {
+       processBatchDomains(batchId).catch((err) => {
+         console.error(`Batch ${batchId} processing error:`, err.message)
+  +      db("batches")
+  +        .where({ id: batchId })
+  +        .update({ status: "failed", completed_at: db.fn.now() })
+  +        .catch((updateErr) => console.error(`Failed to update batch ${batchId} status:`, updateErr))
+       })
+     }
+
+  Consider also logging to audit_logs for visibility.
+
+
+────────────────────────────────────────────────────────────────────────
+  minor [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/web/src/pages/LoginPage/LoginPage.jsx:44apps/web/src/pages/LoginPage/LoginPage.jsx:44-52]8;;
+
+  Incorrect aria-invalid attribute tied to form-level error instead of
+  field state.
+
+  Line 50 sets aria-invalid={apiError ? "true" : undefined}, which ties
+  the email field's validation state to the form-level API error
+  (apiError). The aria-invalid attribute should reflect the field's own
+  validation state from Formik (errors.email && touched.email), not the
+  overall API response error.
+
+  As per coding guidelines, React forms must maintain proper accessibility
+  with correct aria-invalid usage for field-level errors.
+
+
+
+
+
+  ♿ Proposed fix for proper field-level aria-invalid
+
+  -          {({ isSubmitting }) => (
+  +          {({ isSubmitting, errors, touched }) => (
+               <Form className="mt-8 space-y-5">
+                 <div>
+                   <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                     Email
+                   </label>
+                   <Field
+                     id="email"
+                     name="email"
+                     type="email"
+                     autoComplete="email"
+                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+  -                  aria-invalid={apiError ? "true" : undefined}
+  +                  aria-invalid={errors.email && touched.email ? "true" : undefined}
+                   />
+                   <ErrorMessage name="email" component="div" className="mt-1 text-sm text-red-600" role="alert" />
+                 </div>
+
+  Apply the same pattern to the password field (line 64).
+
+
+────────────────────────────────────────────────────────────────────────
+  major [potential_issue]
+  → ]8;;vscode://file//app/data/ai_task/email_harvesting/apps/api/src/services/batch.service.js:19apps/api/src/services/batch.service.js:19]8;;
+
+  Synchronous file operation blocks the event loop.
+
+  Line 19 uses fs.renameSync(), which blocks the event loop during file
+  I/O. In a concurrent request environment, this can degrade throughput and
+  increase latency for other requests.
+
+  As per coding guidelines, avoid synchronous blocking operations in
+  JavaScript.
+
+
+
+
+
+  ⚡ Proposed fix using async file operations
+
+  +const fsPromises = require("fs").promises
+  +
+   const createBatchFromUpload = async (userId, file) => {
+     ensureUploadDir()
+     const storageKey = `${Date.now()}-${file.originalname}`
+     const dest = path.join(UPLOAD_DIR, storageKey)
+  -  fs.renameSync(file.path, dest)
+  +  await fsPromises.rename(file.path, dest)
+
+  Also update ensureUploadDir() to use async:
+
+  -const ensureUploadDir = () => {
+  -  if (!fs.existsSync(UPLOAD_DIR)) {
+  -    fs.mkdirSync(UPLOAD_DIR, { recursive: true })
+  +const ensureUploadDir = async () => {
+  +  try {
+  +    await fsPromises.access(UPLOAD_DIR)
+  +  } catch {
+  +    await fsPromises.mkdir(UPLOAD_DIR, { recursive: true })
+     }
+   }
+
+  Then await ensureUploadDir() on line 16.
+
+
+────────────────────────────────────────
+Review complete
+63 findings ✔
+
+Critical 9
+Major    27
+Minor    13
+Trivial  14
+────────────────────────────────────────
+
+Print all AI prompts: coderabbit review --show-prompts

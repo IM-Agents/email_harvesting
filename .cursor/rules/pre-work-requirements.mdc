@@ -1,0 +1,129 @@
+---
+description: Before coding — read README, clarify requirements; after work — preview with PUBLIC_PATH=/qa/{root folder name} and imagent.identixweb.com health checks.
+alwaysApply: true
+---
+
+# Pre-work requirements gate
+
+**MUST** complete this gate before writing or editing production code, unless the user explicitly skips it (e.g. "trivial fix", "hotfix only", "no questions").
+
+## 1. Read project context (MUST — README & docs first)
+
+**First:** read `README.md` and `docs/**` before user brief, plan, or code. Then **think** what is needed (`planning.mdc` § 1). Then plan if non-trivial; subagents if plan splits independent work.
+
+| Source | Path | What to extract |
+|--------|------|-----------------|
+| README | `README.md` | setup, commands, scope, **`{frontend_app}` / `{backend_app}` names**, **env vars with values** |
+| Docs | `docs/**/*.md` | specs, integrations, **env tables / `VAR=value` blocks** |
+| Onboarding | `CLAUDE.md` (if present) | agent/human notes |
+| Env | `.env.example`, app `*/.env.example`, local `.env` | keys from README/docs; **plan `.md` = key only when docs empty**; `.env.example` at implement |
+| Agents | `.cursor/AGENTS.md` | workflow, rule priority |
+| Layout | `.cursor/skills/architecture/SKILL.md` | patterns — **folder names from README, not assumed `apps/web`** |
+| Planning | `.cursor/rules/planning.mdc` | requirements → research → plan before code |
+| Figma tree | `docs/figma-tree.md` | screens, routes, Requirements — **read if present; do not auto-create** |
+
+If `README.md` is empty or stale, **say so** and ask the user for setup, stack, and scope before large changes.
+
+### `docs/figma-tree.md` — read only (do not auto-create)
+
+**Canonical path:** `{monorepo}/docs/figma-tree.md`
+
+| | |
+|--|--|
+| **Exists** | Read **Requirements** + Navigation Tree first; derive § 2 summary from this file |
+| **Missing** + UI/Figma in scope | **MUST NOT** create the file — **ask user** for the index, Figma URL + scope, or written spec; derive requirements from their answer / README / prototype-tree API **in summary only** |
+
+Workflow: `.cursor/skills/figma-tree-todo/reference/figma-tree-index.md`.
+
+## 2. Clarify the request (MUST)
+
+Produce a short **Requirements summary** (bullets) **from `docs/figma-tree.md`** (when UI applies) plus README/user input:
+
+- **Problem** — what user/system problem this solves
+- **Done when** — acceptance criteria (testable)
+- **In scope** / **Out of scope**
+- **Stack** — files/areas touched (match `.cursor/rules/*-stack.mdc`)
+- **Data/API** — new or changed endpoints, DB, authZ
+- **UX** — screens, states (loading/error/empty), copy if known
+- **Technologies** — every stack/lib named in requirements → matching `.cursor/rules/*-stack.mdc`
+- **Env** — exact **key** from README/docs; plan `.md` Value = `—` when docs have no value; wire `.env.example` at implement (§ 2c)
+- **App paths** — `{frontend_app}`, `{backend_app}` from README/workspaces (not hardcoded `apps/web` / `apps/api`)
+
+For non-trivial work: **think** → master **`plan/plan-[name].md`** → **`plan/features/{slug}.md` per feature** (if multi-feature) → subagents if needed (`planning.mdc` § 2–3) before § 5 implement.
+
+## 3. Design / Figma (MUST when UI or flows change)
+
+- **MUST** read `docs/figma-tree.md` when it exists and derive scope from **Requirements** + **Navigation Tree**.
+- **MUST NOT** auto-create `docs/figma-tree.md` — if missing, **ask user** for the file or Figma URL + scope (`figma-tree-index.md`).
+- **MUST** align with `.cursor/rules/figma-tree-structure-checklist.mdc` for hierarchy and prototype conventions.
+- **MUST** for page-wise UI work: load `.cursor/skills/figma-tree-todo/SKILL.md` and follow `.cursor/rules/figma-tree-implementation.mdc`.
+- **MUST** resolve open questions: layout, breakpoints, empty/error states, navigation, design tokens vs ad-hoc styles.
+
+If Figma `fileKey` is missing and index cannot be created, **ask** for Figma URL or approved wireframe before implementing visuals.
+
+## 4. Ask before coding (MUST if any blocker)
+
+Do **not** start implementation until the user answers or explicitly accepts assumptions.
+
+| Missing | Ask |
+|---------|-----|
+| Goal or acceptance criteria | "What should 'done' look like? Any must-have vs nice-to-have?" |
+| Figma / UI spec | "Please provide `docs/figma-tree.md` or Figma fileKey + entry nodeId + screen scope?" |
+| API contract | "Request/response shape? Auth required? Error codes?" |
+| Data / migrations | "New tables/columns? Backward compatibility?" |
+| Env / services | Plan `.md`: key only if docs empty; local `.env` non-empty for boot-required keys; `.env.example` + comment at implement |
+| Unknown required tech | Research: context7 → web → **marketplace/MCP/skills** — `planning.mdc` § 7a |
+| Conflicting instructions | "You mentioned X and Y — which takes priority?" |
+
+Use **AskQuestion** or a numbered list when multiple decisions are needed.
+
+## 5. Plan, subagents, then implement
+
+| Step | When |
+|------|------|
+| **Think** | Always after README/docs — features, gaps, scope |
+| **Master plan** | Non-trivial — `plan/plan-[name].md` |
+| **Feature chunks** | 2+ features — `plan/features/{slug}.md` each (thinking + steps per chunk) |
+| **Subagents** | Independent tracks or one subagent per feature chunk when parallel |
+| **Code** | One feature chunk at a time; mark chunk `done` before next |
+
+After blockers cleared:
+
+1. Select stack rule(s) from technologies in README/docs/requirements.
+2. Use resolved `{frontend_app}` / `{backend_app}` paths.
+3. Implement smallest milestone (parent or delegated subagent).
+4. Validate (tests/lint) as applicable.
+
+Agents: `plan-execute`, `requirements-architect`, or Task subagents (`explore`, `generalPurpose`, `shell`) per plan.
+
+## 6. Post-work preview verification (MUST when all implementation is done)
+
+When **all** requested code/UI work is finished, **MUST** run production preview and confirm it works **before** marking the task complete. See `architecture.mdc` § 4.3.
+
+**MUST NOT** report “done” until local (and IM platform public, when applicable) health checks pass.
+
+| Step | Action |
+|---|---|
+| 0 | **MySQL (if backend uses DB):** `{db_name}` in `{monorepo}/.env`; Docker `DB_HOST=db`; preview runs `db:migrate` then `db:init` if schema missing — corrupt migrations → reset `{db_name}` (`architecture.mdc` § 3.1–3.2, `database-common-stack.mdc`) |
+| 1 | Set `{root folder name}` = basename of repo root (`basename "$(pwd)"`) |
+| 2 | Run `PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run preview` (or `pnpm preview`) |
+| 3 | **Local:** `curl` API health + frontend under `/qa/{root folder name}/` (read `PORT` / `API_PORT` from `.preview.ports` or logs) |
+| 3b | **MySQL:** `db:status` + confirm **all expected tables** exist in `{db_name}` (`SHOW TABLES` / migrations); then test **every** DB API — fix missing tables/migrations or route errors, re-test **before** moving on (`database-common-stack.mdc`, `architecture.mdc` § 4.3 Step 3b) |
+| 4 | **Public (IM platform):** `https://imagent.identixweb.com/qa/{root folder name}/api/health` and frontend URL |
+| 5 | **If anything fails:** `preview:stop` → read `preview-*.log` → fix → repeat from step 2 (see fix order below) |
+| 6 | When all pass: `preview:stop`; report preview command, health URLs, **tables verified**, and DB API routes tested in summary |
+
+### If preview is not working — fix order
+
+| Symptom | Check / fix |
+|---------|-------------|
+| Preview exits immediately or 502 on frontend | `preview-api.log` / `preview-proxy.log`; rebuild `PUBLIC_PATH='/qa/{root folder name}' npm run build -- --force` |
+| API health 404 via proxy, OK on direct `API_PORT` | Missing `/api` in fetch paths — `architecture.mdc` § 4.2.1 |
+| `db:migrate` / API boot DB errors | `DB_NAME={db_name}` in `{monorepo}/.env`, `DB_HOST=db` in Docker, `npm run db:init` or reset corrupt schema (`database-common-stack.mdc`) |
+| Missing table / pending `db:status` | `db:migrate` or add migration; `SHOW TABLES` on `{db_name}` (`database-common-stack.mdc` § A) |
+| Health OK but DB API `500` / SQL error | Fix schema/handler/seed; `db:migrate`; re-verify tables; re-test all DB routes (`architecture.mdc` § 4.3 Step 3b) |
+| Stale webpack `PUBLIC_PATH` | `turbo run build -- --force` then preview again (`turbo-env-cache.mdc`) |
+
+- API paths **MUST** use `/api/...` (e.g. `/qa/{root folder name}/api/health`, not `/qa/{root folder name}/v1/...`).
+- **MUST NOT** hardcode a project slug in `PUBLIC_PATH` — always derive from the repo root folder name.
+- Rebuild with `--force` if `PUBLIC_PATH` or webpack env changed since last build.

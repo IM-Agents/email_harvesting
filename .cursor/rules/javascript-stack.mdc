@@ -1,0 +1,222 @@
+---
+description: JavaScript and ES6+ best practices for modern development
+globs: **/*.js, **/*.jsx, **/*.mjs, src/**/*.js, src/**/*.jsx
+---
+
+# JavaScript and ES6+ Best Practices
+
+## Code Organization
+- Use modular architecture
+- Implement proper file structure
+- Group related functionality
+- Keep files focused and small
+- Use clear module boundaries
+- Avoid circular dependencies
+
+## Naming Conventions
+- Use camelCase for variables and functions
+- Use UPPER_SNAKE_CASE for constants
+- Use PascalCase for classes and components
+- Use descriptive, meaningful names
+- Prefix boolean variables with is/has/should/can
+- Use verb-based names for functions
+
+## Variables and Constants
+- Use const by default
+- Use let when variable reassignment needed
+- Never use var
+- Declare variables in proper scope
+- Use destructuring where appropriate
+- Keep variable scope minimal
+
+## Functions
+- Use arrow functions for callbacks
+- Write pure functions when possible
+- Keep functions small and focused
+- Use proper error handling
+- Implement meaningful return types
+- Document complex functions
+
+## Async Programming
+- Use async/await for asynchronous code
+- Avoid callback chains (callback hell)
+- Handle promise rejections properly
+- Use Promise.all for parallel operations
+- Implement proper error handling
+- Set timeouts for long-running operations
+
+## Error Handling
+- Implement try-catch blocks appropriately
+- Throw meaningful error messages
+- Log errors with context
+- Create custom error classes
+- Handle async errors properly
+- Never silently catch errors
+
+## Performance Optimization
+- Debounce and throttle event handlers
+- Implement memoization for expensive operations
+- Use lazy loading for modules
+- Optimize bundle size
+- Avoid memory leaks
+- Profile performance regularly
+
+## DOM Manipulation
+- Clean up event listeners
+- Use event delegation appropriately
+- Batch DOM updates
+- Avoid unnecessary reflows
+- Use DocumentFragment for multiple elements
+- Implement proper cleanup functions
+
+## Module System
+- Use ES6 named exports (tree-shakeable)
+- Avoid default exports when possible
+- Implement proper import statements
+- Use dynamic imports for code splitting
+- Keep module boundaries clear
+- Document public APIs
+
+## String Handling
+- Use template literals for string interpolation
+- Avoid string concatenation
+- Use proper string methods
+- Implement proper encoding/decoding
+- Handle Unicode properly
+- Sanitize user input
+
+## Array Operations
+- Use array methods (map, filter, reduce)
+- Avoid mutating original arrays
+- Use proper iteration patterns
+- Implement efficient searches
+- Use Array.isArray for type checking
+- Document array transformations
+
+## Object Handling
+- Use object destructuring
+- Avoid modifying object prototypes
+- Use Object methods appropriately
+- Implement proper deep copies
+- Use Object.freeze for immutability
+- Document object structures
+
+## Type Checking
+- Use typeof for type checks
+- Implement proper null/undefined checks
+- Use strict equality (===, !==)
+- Avoid loose equality (==, !=)
+- Use Number.isFinite for number checks
+- Document expected types
+
+## Regular Expressions
+- Use proper regex patterns
+- Add comments for complex patterns
+- Test regex thoroughly
+- Avoid catastrophic backtracking
+- Use proper flags
+- Document regex purposes
+
+## JSON Operations
+- Validate JSON before parsing
+- Handle JSON parsing errors
+- Implement proper serialization
+- Use proper indentation for readability
+- Avoid circular references
+- Document JSON structures
+
+## Code Quality
+- Use proper linting (ESLint)
+- Follow consistent formatting
+- Remove commented-out code
+- Implement proper comments
+- Use meaningful variable names
+- Keep functions under 50 lines
+
+## Testing
+- Write unit tests for functions
+- Implement integration tests
+- Test error scenarios
+- Mock external dependencies
+- Use proper test frameworks
+- Maintain test coverage > 70%
+
+## Security
+- Validate all user input
+- Escape output properly
+- Use secure random generation
+- Handle sensitive data carefully
+- Never log sensitive information
+- Keep dependencies updated
+
+## Logging and Debugging
+- Implement structured logging
+- Use appropriate log levels
+- Remove console.log from production
+- Use debugger appropriately
+- Log meaningful information
+- Monitor application performance
+
+## Best Practices
+- Follow JavaScript best practices
+- Use proper naming conventions
+- Implement error handling consistently
+- Write maintainable code
+- Document complex logic
+- Review code regularly
+
+## Common Pitfalls to Avoid
+- Don't use eval()
+- Avoid global variables
+- Don't use with statement
+- Avoid deeply nested code
+- Don't create memory leaks
+- Avoid synchronous blocking operations
+
+## Browser Compatibility
+- Test on multiple browsers
+- Use proper polyfills
+- Implement feature detection
+- Handle browser differences
+- Test on mobile devices
+- Implement graceful degradation
+
+## Performance Metrics
+- Monitor page load time
+- Track runtime performance
+- Optimize critical rendering path
+- Minimize main thread work
+- Implement proper caching
+- Profile regularly
+
+## Build and Bundling
+- Use proper build tools
+- Implement code splitting
+- Optimize bundle size
+- Use tree-shaking
+- Minify production code
+- Source maps for debugging
+
+## Dependency Management
+- Keep dependencies updated
+- Review third-party packages
+- Use package managers properly
+- Lock dependency versions
+- Monitor for vulnerabilities
+- Minimize external dependencies
+
+## Version Control
+- Write meaningful commit messages
+- Keep commits focused
+- Use proper branching strategy
+- Document code changes
+- Review pull requests thoroughly
+- Maintain clear history
+
+## Documentation
+- Add JSDoc comments
+- Document public APIs
+- Include usage examples
+- Document edge cases
+- Keep docs updated
+- Explain complex logic

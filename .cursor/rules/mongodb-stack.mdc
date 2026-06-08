@@ -1,0 +1,93 @@
+---
+description: MongoDB schema, indexing, aggregation, and Node.js driver best practices
+globs: **/*.js, **/*.ts, **/repositories/**/*, **/models/**/*, db/migrations/mongodb/**/*
+alwaysApply: false
+---
+
+# MongoDB Best Practices
+
+Full standards: `.cursor/skills/mongodb/SKILL.md` · Reference: `.cursor/skills/mongodb/reference/`
+
+## Schema design
+
+- **MUST** choose embed vs reference: embed when always read together and bounded; reference when shared or unbounded.
+- **MUST** add `createdAt` / `updatedAt` on mutable collections; use one soft-delete pattern (`deletedAt` or status).
+- **MUST** use `Decimal128` or integer minor units for money—never float.
+- **MUST** enforce validation at write boundary (JSON Schema or Mongoose).
+- **SHOULD** use plural collection names with one casing convention per repo (`orders`, `order_items`).
+- **SHOULD** store foreign keys as `ObjectId` (`userId`), not untyped strings.
+
+## Indexing
+
+- **MUST** index hot query paths; verify with `explain("executionStats")` before release.
+- **MUST** order compound indexes: equality → sort → range.
+- **SHOULD** use partial unique indexes when soft-deleting (`partialFilterExpression: { deletedAt: null }`).
+- **SHOULD** use TTL indexes only for true expiry (sessions, tokens).
+
+```javascript
+// ✅ GOOD — list + sort
+db.orders.createIndex({ userId: 1, createdAt: -1 })
+
+// ✗ BAD — no index on hot filter
+db.orders.find({ userId }).sort({ createdAt: -1 }).limit(50)
+```
+
+## Queries & pagination
+
+- **MUST** use field projections on hot reads; never return full large documents by default.
+- **MUST** cap `limit` on every request-path query.
+- **MUST** use keyset pagination for large lists—avoid deep `skip`.
+- **SHOULD** put `$match` first in aggregation pipelines.
+
+```javascript
+// ✅ GOOD — projection + keyset
+collection.find(
+  { userId, deletedAt: null, createdAt: { $lt: cursor } },
+  { projection: { status: 1, totalCents: 1, createdAt: 1 } }
+).sort({ createdAt: -1 }).limit(20)
+
+// ✗ BAD
+collection.find({ userId }).skip(page * 1000).limit(20)
+collection.find({ [req.query.field]: value }) // user-controlled keys
+```
+
+## Node.js integration
+
+- **MUST** use one `MongoClient` (or one Mongoose connection) per process; `close()` on graceful shutdown.
+- **MUST** access MongoDB only from repositories/services—not route handlers.
+- **MUST** validate `ObjectId` before queries; map duplicate key (`11000`) to 409.
+- **SHOULD** prefer official `mongodb` driver unless team standard is Mongoose.
+
+```javascript
+// ✅ GOOD — singleton + repository
+export async function getMongoClient() {
+  if (!client) {
+    client = new MongoClient(process.env.MONGODB_URI)
+    await client.connect()
+  }
+  return client
+}
+
+// ✗ BAD
+app.get('/orders', async (req, res) => {
+  const c = new MongoClient(uri) // new client per request
+  await c.connect()
+  ...
+})
+```
+
+## Security & operations
+
+- **MUST** use TLS and least-privilege DB users in production; credentials from env/secrets only.
+- **MUST** use fixed filter shapes—never build query keys from user input.
+- **MUST** version migrations under `db/migrations/mongodb/`; forward-only in CI.
+- **SHOULD** use `writeConcern: { w: 'majority' }` for durable writes on replica sets.
+- **SHOULD** document RPO/RTO and test restores (Atlas PITR or `mongodump`).
+
+## Anti-patterns
+
+- Unbounded embedded arrays (comments, events without archival).
+- Collection scans (`COLLSCAN`) on high-traffic endpoints.
+- Storing large binaries in documents (use GridFS or object storage).
+- MongoDB as cache without TTL (use Redis per nodejs skill).
+- Mixing Mongoose + native driver on the same collection without documented reason.

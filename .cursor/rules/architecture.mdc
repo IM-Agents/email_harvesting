@@ -1,0 +1,534 @@
+---
+description: Monorepo architecture — webpack, root packageManager, .env PORT/PUBLIC_PATH, preview
+alwaysApply: true
+---
+
+# Architecture Rules
+
+Apply when scaffolding or extending monorepos. Follow `.cursor/skills/architecture/` and `references/react-node-structure.md` for full layouts.
+
+## 0. Project layout — placeholders (Required)
+
+Examples in this file use `apps/web` and `apps/api` — **not every repo uses those names**.
+
+| Placeholder | Resolve from |
+|-------------|--------------|
+| `{frontend_app}` | `README.md`, `docs/`, root `workspaces` — e.g. `apps/web`, `apps/frontend`, `app/frontend` |
+| `{backend_app}` | Same — e.g. `apps/api`, `app/backend`, `apps/server` |
+| `{monorepo}` | Repository root |
+
+- **MUST** read README + docs + `package.json` workspaces to set `{frontend_app}` and `{backend_app}` before scaffold, plan, or preview work (`planning.mdc` § 2).
+- **MUST NOT** rename existing app folders to match examples unless the user or README requires it.
+- Preview scripts, `db:init`, and webpack paths **MUST** use resolved `{frontend_app}` / `{backend_app}` (see `react-node-structure.md` — probe `apps/*` or `app/backend`).
+
+## 1. Frontend — Webpack Only
+
+- **MUST** use **webpack 5** as the frontend build tool (`webpack`, `webpack-cli`, `webpack-dev-server`).
+- **MUST NOT** use Vite, Parcel, Rollup, esbuild-only SPA tooling, Create React App, or Next.js for new frontends.
+- React SPAs: `webpack.config.js` or `webpack.config.ts` in `{frontend_app}/` (example: `apps/web/`).
+- Node APIs bundled for deploy: `webpack` + `webpack-node-externals` (see architecture skill Variant F/G).
+
+```json
+// apps/web/package.json — required scripts
+{
+  "scripts": {
+    "dev": "webpack serve --mode development",
+    "build": "webpack --mode production"
+  }
+}
+```
+
+### CSS Modules (css-loader v7)
+
+When `apps/web` uses **CSS Modules** (`*.module.css`) with `import styles from "./X.module.css"`:
+
+- **MUST** pin `"css-loader": "^7.1.2"` (or newer v7) in `apps/web/package.json`.
+- **MUST** set `modules.namedExport: false` in the webpack css-loader rule (for `.module.css` or `modules.auto: /\.module\.css$/i`). css-loader v7 defaults `namedExport: true`, so the default export is CSS for `style-loader`, **not** the class map — causes `Cannot read properties of undefined (reading '…')` at module load.
+- **MUST** name scoped files `Component.module.css`; global styles stay in `index.css` (no `.module` suffix).
+- Full webpack snippets: `skills/architecture/references/react-node-structure.md` — **CSS Modules + css-loader v7**.
+
+## 2. Root Folder & `packageManager` (Required)
+
+- **MUST** create or update the **root** `package.json` (monorepo workspace root, not only app-level).
+- **MUST ALWAYS** include `"packageManager"` in root `package.json` — never omit it on new or updated repos.
+
+```json
+{
+  "name": "my-monorepo",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build"
+  }
+}
+```
+
+| Manager | `packageManager` value (use exact installed version) |
+|---------|--------------------------------------------------------|
+| npm | `"packageManager": "npm@10.9.2"` |
+| pnpm | `"packageManager": "pnpm@9.15.0"` |
+| yarn (Berry) | `"packageManager": "yarn@4.5.0"` |
+| bun | `"packageManager": "bun@1.1.0"` |
+
+- Pin the **exact** version (e.g. `npm@10.9.2`, not `npm@10`) so Corepack and CI use the same tool.
+- When switching managers, update `"packageManager"` in the same change as lockfile / workspace config.
+- **MUST NOT** ship a root `package.json` without `"packageManager"`.
+- **npm / yarn classic / bun**: declare `"workspaces": ["apps/*", "packages/*"]` on root `package.json`.
+- **pnpm**: add root `pnpm-workspace.yaml`; root `package.json` omits `"workspaces"` but **still requires** `"packageManager"`.
+- Root scripts orchestrate Turbo: `dev`, `build`, `lint`, `test`, `preview`, `preview:stop` via `turbo run …` or `node scripts/…`.
+- **`turbo.json` `build.env`**: list `PUBLIC_PATH`, `API_BASE_URL`, `NODE_ENV`, `PORT`, `API_PORT`, `WEB_PORT` so cache invalidates when they change. See `turbo-env-cache.mdc`.
+- After changing `PUBLIC_PATH` on the CLI: `npm run build -- --force` then `npm run preview`.
+
+## 3. Root `.env` — PORT, PUBLIC_PATH, API (Required)
+
+All port and path configuration **MUST** come from the **root** `.env` (see architecture skill `react-node-structure.md` — Global Preview System). Commit `.env.example`; gitignore `.env`.
+
+### Root `.env.example` (required variables)
+
+```bash
+# Single public-facing port (reverse proxy)
+PORT=8080
+
+# Asset + route prefix (/ for root, /myapp/ for subpath deploy) — path only, not a full URL
+PUBLIC_PATH=/
+
+# Internal app ports (preferred defaults — preview auto-picks free ports if busy)
+WEB_PORT=3001
+API_PORT=4000
+
+# Base URL for React API calls (preview rewrites when API_PORT changes)
+API_BASE_URL=http://localhost:4000
+
+NODE_ENV=production
+```
+
+### Wiring rules
+
+| Variable | Used by |
+|---|---|
+| `PORT` | `scripts/proxy.js` — single entry URL `http://localhost:{PORT}{PUBLIC_PATH}` |
+| `PUBLIC_PATH` | webpack `output.publicPath`, proxy static routes, SPA fallback |
+| `API_PORT` | `preview-start.js` — probes `127.0.0.1`; picks next free port from `.env` preferred value (default `4000`) |
+| `WEB_PORT` | webpack dev only (not used by production preview) |
+| `API_BASE_URL` | Server-side / direct API access only. **Browser** `__API_BASE_URL__` in prod **MUST** be `PUBLIC_PATH` (e.g. `/qa/{root folder name}`), not `http://localhost:{API_PORT}` — so fetches hit `/{PUBLIC_PATH}/api/...` through nginx + project proxy |
+
+### Preview `API_PORT` auto-assignment (Required)
+
+`scripts/preview-start.js` **MUST** resolve a free **`API_PORT`** on `127.0.0.1` before spawning `apps/api` and `scripts/proxy.js`. Do not assume `.env` `API_PORT` is free.
+
+| Port var | Default preferred | Auto-probe in `preview-start.js` | Used by |
+|----------|-------------------|----------------------------------|---------|
+| `API_PORT` | `4000` | **Yes** — scan upward to `9999` if busy | `apps/api` listen; `proxy.js` → `target` |
+| `PORT` | `8080` | **Yes** — same probe as `API_PORT` (do not use `4001` in Docker; nginx uses it) | `scripts/proxy.js` listen; IM backend forwards `/qa/{root folder name}` here |
+| `WEB_PORT` | `3001` | No | webpack dev only |
+
+**Algorithm** (inline in `scripts/preview-start.js` — do not require a separate `portUtils` package unless shared across repos):
+
+1. Capture CLI `PUBLIC_PATH`, `PORT`, `API_PORT` **before** `loadEnv()`, restore after (CLI wins over `.env`).
+2. `loadEnv({ rootDir })` — read preferred `API_PORT` from root `.env` / `.env.example`.
+3. `findAvailablePort(preferredPort)` and `findAvailablePort(preferredApiPort)` — probe `127.0.0.1`; if busy, scan upward to `9999`.
+4. Build shell env prefix: `PUBLIC_PATH='…' PORT={PORT} API_PORT={API_PORT} NODE_ENV=production` (escape single quotes in `PUBLIC_PATH`).
+5. Spawn **api** and **proxy** via `spawn("sh", ["-c", `${envPrefix} ${shellCmd}`], …)` — **do not** pass a spawn `env` object; inline prefix wins over parent `.env`.
+6. Write `{root}/.preview.ports` (`PORT=`, `API_PORT=`) and `{root}/.preview.pids`; log when bumped: `[preview] PORT 8080 in use → 8081`.
+7. Log ready: `[preview] Ready → proxy http://127.0.0.1:{PORT}{PUBLIC_PATH} | API http://127.0.0.1:{API_PORT}`.
+8. **Docker / IM platform**: project `PORT` is internal (`8080+`). Public URL: `https://imagent.identixweb.com/qa/{root folder name}/` via nginx — never bind preview proxy to `4001`.
+
+- **MUST** probe **both** `PORT` and `API_PORT` on `127.0.0.1` before spawn.
+- **MUST** pass resolved `PUBLIC_PATH`, `PORT`, and `API_PORT` to both children via the shell prefix (same values for api + proxy).
+- **MUST NOT** start preview assuming `.env` ports are free.
+- Full script pattern: `skills/architecture/references/react-node-structure.md` — Global Preview System.
+
+- **webpack**: `require("./src/config/env")` only — set `output.publicPath` from validated `env.PUBLIC_PATH` (never raw `dotenv` in webpack).
+- **API calls**: inject `__API_BASE_URL__` with `DefinePlugin` (dev: `"/api"` via devServer proxy; prod: `PUBLIC_PATH` when subpath deploy).
+- **preview scripts** (`preview-start.js`, `preview-stop.js`, `proxy.js`): use `loadEnv({ rootDir })` from `@repo/config/loadEnv`; capture CLI `PUBLIC_PATH` / `PORT` / `API_PORT` **before** `loadEnv()` and restore after so shell/CI wins.
+- **API server**: read `API_PORT` from `@repo/config/env` (Joi default `4000`); never hardcode ports in source.
+- Add to root `.gitignore`: `.env`, `.preview.pids`, `.preview.ports`, `preview-*.log`.
+
+## 3.1 MySQL database bootstrap (Required)
+
+Applies when `{monorepo}` (or `apps/api`) uses **MySQL** with Knex / `mysql2`. See `database-common-stack.mdc`, `mysql-stack.mdc`, `env-variables.mdc` (placeholders: `{db_name}`, `{platform_db_name}`, `{root folder name}`).
+
+- **MUST** set `DB_NAME={db_name}` in `{monorepo}/.env` — unique per app; **never** `{platform_db_name}` for child QA monorepos.
+- **MUST** use `loadEnv()` so `DB_NAME` comes from `{monorepo}/.env` after dotenv (not parent inject).
+
+### If the schema does not exist
+
+From backend package root (`apps/api/` or `{monorepo}/app/backend/`):
+
+```bash
+npm run db:init    # CREATE DATABASE {db_name} if missing + knex migrate:latest
+```
+
+| Command | When |
+|---------|------|
+| `npm run db:init` | First setup or MySQL has no schema for `{db_name}` |
+| `npm run db:migrate` | Schema exists; apply pending migrations only |
+| `npm run db:status` | Check which migrations ran |
+
+- **MUST NOT** use `db:init` alone to fix **corrupt** `knex_migrations` on a **wrong** existing database — reset `{db_name}` schema in dev, then `db:init`.
+
+### Knex corrupt migrations at preview
+
+If migrate fails with **“migration directory is corrupt”**:
+
+- Wrong `DB_NAME` (pointing at `{platform_db_name}` or another app’s schema).
+- Fix: set `{db_name}` in `{monorepo}/.env`, `DROP`/`CREATE` that schema (dev), `npm run db:init --workspace=api`.
+- **MUST** verify `DB_HOST=db` in container (not overridden by `.env` `localhost`).
+
+### 3.2 Preview — always run DB before spawn (Required)
+
+**Every** `npm run preview` / `pnpm preview` **MUST** apply pending MySQL schema **before** spawning the API (inside `preview-start.js` or an equivalent pre-spawn hook). Do not rely only on API boot migrate.
+
+| Step | Command | When |
+|------|---------|------|
+| 1 | `npm run db:migrate` | **Always** at preview start (backend package: `apps/api/` or `app/backend/`) |
+| 2 | `npm run db:init` | **Only if** step 1 fails (e.g. `{db_name}` missing / unknown database) |
+| 3 | Spawn API + proxy | After DB step succeeds; on **corrupt migrations** — fix `{db_name}` + schema reset (§ 3.1), not only `db:init` |
+
+| Action | Runs `db:migrate`? | Runs `db:init`? | Runs tests? |
+|--------|-------------------|-----------------|-------------|
+| **`npm run preview`** | **Yes** (required, before spawn) | Yes, if migrate fails (DB missing) | No |
+| `npm run db:init` / `db:migrate` (manual) | Per command | Per command | No |
+| API boot after preview | May also run `migrate.latest` | No (DB must exist) | No |
+| `turbo run test` | No | No | Yes (separate; not on preview) |
+
+**Implementation (MUST)**
+
+- `scripts/preview-start.js` calls `ensureDatabaseForPreview()` **after** `loadEnv()` and **before** port probe / spawn — see `react-node-structure.md` → **Reference — preview scripts**.
+- Backend package **MUST** expose `db:migrate` and `db:init` in `package.json` (Knex: `scripts/init-db.js` + `knex migrate:latest`).
+- **MUST NOT** skip DB setup when MySQL is configured (`DB_*` in env).
+- **MUST NOT** auto-run the full test suite on every preview unless the user or CI asks.
+
+## 4. Preview Scripts (Required)
+
+Every monorepo **MUST** expose production preview at the **root** so skills and agents can build, run, and verify the full flow on one port.
+
+| Package manager | Root scripts |
+|---|---|
+| npm | `"preview": "turbo run build && node scripts/preview-start.js"`, `"preview:stop": "node scripts/preview-stop.js"` |
+| pnpm | same script bodies; run as `pnpm preview` / `pnpm preview:stop` |
+
+- Implement `scripts/preview-start.js`, `scripts/preview-stop.js`, and `scripts/proxy.js` from `react-node-structure.md` → **Reference — preview scripts**.
+- `preview-start.js` **MUST** run `db:migrate` then spawn; on failure run `db:init` (§ 3.2).
+- Add `.preview.pids` and `.preview.ports` to `.gitignore`.
+
+### 4.1 Preview runs in background (Required)
+
+`npm run preview` / `pnpm preview` **MUST return to the shell** — do not block the terminal on the proxy or API process.
+
+- **API** (and **web** if it has its own server): spawn with `detached: true`, `stdio: "ignore"`, then `proc.unref()`.
+- **Proxy** (`scripts/proxy.js`): start as the **last step**, also **in background** (same detached pattern) — not `require("./proxy")` in the foreground.
+- Write every background PID to `.preview.pids` (API, web if any, proxy).
+- Resolve free `PORT` and `API_PORT` before spawn; pass both via shell env prefix (not spawn `env`).
+- Redirect stdout/stderr to `preview-{label}.log`; `preview-start.js` exits after spawn (URLs printed, `main()` resolves).
+- Full implementations: `react-node-structure.md` → **Reference — preview scripts**.
+
+- **MUST NOT** use `stdio: "inherit"` or blocking `require("./proxy")` for the final server — that prevents background preview.
+- `preview:stop` kills all PIDs in `.preview.pids` and frees ports from `.preview.ports` (fallback: `.env`).
+
+### 4.2 Reverse proxy — API path routing (Required)
+
+`scripts/proxy.js` **MUST** forward `/api/*` to the API with the `/api` prefix intact.
+
+**Do not** mount the proxy with `app.use('/api', createProxyMiddleware(...))`. Express strips the mount path before the middleware runs, so `/api/v1/history` becomes `/v1/history` upstream and the API returns `404 Not found`.
+
+**Do** gate API traffic explicitly (SPA fallback must not serve HTML for `/api/*`). Full `proxy.js`: `react-node-structure.md` → **Reference — preview scripts**.
+
+| `PUBLIC_PATH` | Incoming request | Proxied to API |
+|---|---|---|
+| `/` | `/api/v1/history` | `http://localhost:{API_PORT}/api/v1/history` |
+| `/myapp` | `/myapp/api/v1/history` | `http://localhost:{API_PORT}/api/v1/history` (via `pathRewrite`) |
+| `/qa/{root folder name}` | `/qa/{root folder name}/api/v1/...` | `http://localhost:{API_PORT}/api/v1/...` |
+
+- **MUST** verify proxied routes after preview start: `curl -sf "http://localhost:{PORT}/api/health"` and at least one `/api/v1/*` route (not only direct `API_PORT`).
+- With subpath deploy, also curl through `{PUBLIC_PATH}/api/...` (e.g. `http://localhost:{PORT}/qa/{root folder name}/api/health`).
+- webpack devServer `proxy` with `context: ["/api"]` is unaffected (webpack does not strip the mount path).
+
+### 4.2.1 Browser API URL contract (Required — prevents 404 on subpath preview)
+
+When `PUBLIC_PATH='/qa/{root folder name}'`:
+
+| Layer | Rule |
+|---|---|
+| **webpack `DefinePlugin`** | `__API_BASE_URL__` = normalized `PUBLIC_PATH` in prod (e.g. `/qa/{root folder name}`), **`/api` in dev** — **never** `API_BASE_URL` (`http://localhost:4000`) |
+| **`apiFetch` / `fetch` paths** | **MUST** start with `/api/...` (e.g. `/api/v1/...`) |
+| **Full browser URL** | `{origin}{PUBLIC_PATH}/api/v1/...` — e.g. `https://imagent.identixweb.com/qa/{root folder name}/api/v1/...` |
+| **proxy.js** | Only matches `{PUBLIC_PATH}/api/*` — requests without `/api` are **not** proxied to the API |
+
+```text
+❌ POST /qa/{root folder name}/v1/...     → 404 Cannot POST … (SPA or wrong handler)
+✅ POST /qa/{root folder name}/api/v1/... → proxied to apps/api
+```
+
+```js
+// ❌ BAD — missing /api in endpoint when __API_BASE_URL__ is PUBLIC_PATH
+apiFetch("/v1/...")
+
+// ✅ GOOD
+apiFetch("/api/v1/...")
+```
+
+- **MUST** rebuild web after changing `PUBLIC_PATH`: `PUBLIC_PATH='/qa/{root folder name}' npm run build -- --force` then `npm run preview`.
+- Full examples: `react-node-structure.md` → **Fix: API base path in React apps**.
+
+### 4.3 Verify preview after work is done (Required)
+
+When implementation is complete, **before** considering the task done, run production preview with the **IM QA subpath** and verify **local + public** health.
+
+**MySQL backends:** Verify `{db_name}` and Docker `DB_HOST=db` before preview (§ 3.2). After health: confirm **all tables** exist (`db:status`, `SHOW TABLES`), then test **every** DB-backed API — fix and re-test before done (§ 4.3 Step 3b). Do not require `turbo run test` unless the user asked.
+
+#### Step 1 — Derive `PUBLIC_PATH` from repo folder name
+
+| Repo root folder (basename) | `PUBLIC_PATH` |
+|---|---|
+| `{root folder name}` | `/qa/{root folder name}` |
+
+- **MUST** use `PUBLIC_PATH='/qa/{root folder name}'` where `{root folder name}` is the **basename of the monorepo root** (same name nginx uses under `/qa/`). **Do not hardcode** a project name (e.g. do not assume `calculator`).
+- **MUST NOT** mark the task done without this exact preview command (adjust package manager if needed):
+
+```bash
+PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run preview
+# or: PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production pnpm preview
+```
+
+- If `PUBLIC_PATH` changed, rebuild first: `PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run build -- --force`
+
+#### Step 2 — Wait for processes
+
+Wait 2–5s (retry with backoff). Read `{root}/.preview.ports` for `PORT` and `API_PORT` if logs differ from defaults.
+
+#### Step 3 — Local health checks (Required)
+
+| Check | URL | Pass |
+|---|---|---|
+| **API direct** | `http://127.0.0.1:{API_PORT}/api/health` | HTTP `200` |
+| **API via proxy** | `http://127.0.0.1:{PORT}/qa/{root folder name}/api/health` | HTTP `200` |
+| **Frontend** | `http://127.0.0.1:{PORT}/qa/{root folder name}/` | HTTP `200`, SPA HTML (not 502) |
+| **Sample API route** | `http://127.0.0.1:{PORT}/qa/{root folder name}/api/v1/...` (one real endpoint) | HTTP `2xx` or expected error body (not `404 Cannot POST …/v1/…`) |
+
+```bash
+ROOT_FOLDER="$(basename "$(pwd)")"   # {root folder name}
+PUBLIC_PATH="/qa/${ROOT_FOLDER}"
+PORT=8080                            # from .preview.ports or logs
+API_PORT=4000
+
+curl -sf "http://127.0.0.1:${API_PORT}/api/health"
+curl -sf "http://127.0.0.1:${PORT}${PUBLIC_PATH}/api/health"
+curl -sf -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:${PORT}${PUBLIC_PATH}/"
+```
+
+#### Step 3b — MySQL: verify tables, then test every DB-backed API (Required)
+
+When the backend uses **MySQL**, health alone is **not** sufficient.
+
+**A — Schema (tables)**
+
+1. `npm run db:status` — **no pending** migrations on `{db_name}`.
+2. Compare **expected tables** (from `migrations/`, models, README) to `SHOW TABLES` / `knex.schema.hasTable` in `{db_name}`.
+3. **Missing table or column** → add/apply migration (`db:migrate`), or fix `DB_NAME` / corrupt migrations — **MUST NOT** start API route testing until schema matches code.
+
+**B — APIs**
+
+1. Inventory routes that use the DB (controllers, `src/routes`, `README`, OpenAPI).
+2. **MUST** call each route through `http://127.0.0.1:{PORT}/qa/{root folder name}/api/...` or direct `API_PORT`.
+3. On **any** failure (`5xx`, `ER_NO_SUCH_TABLE`, SQL error, unexpected `404`): **stop**, fix schema/migrations/queries/seeds/handler, re-run `db:migrate` if needed, **re-verify tables**, **re-test that route** — **MUST NOT** mark done while schema or a DB API still fails.
+4. Summary **MUST** list: migrations status, tables verified, routes tested, fixes applied.
+
+See `database-common-stack.mdc` § Verify schema (tables) + test DB-backed APIs.
+
+#### Step 4 — Public domain health checks (Required on IM platform)
+
+**Public base URL (default):** `https://imagent.identixweb.com`  
+(override only if the user or `CLICKUP_PUBLIC_BASE_URL` specifies another host.)
+
+| Check | URL | Pass |
+|---|---|---|
+| **API health (public)** | `https://imagent.identixweb.com/qa/{root folder name}/api/health` | HTTP `200` |
+| **Frontend (public)** | `https://imagent.identixweb.com/qa/{root folder name}/` | HTTP `200`, SPA loads |
+
+```bash
+ROOT_FOLDER="$(basename "$(pwd)")"
+BASE="https://imagent.identixweb.com"
+
+curl -sf "${BASE}/qa/${ROOT_FOLDER}/api/health"
+curl -sf -o /dev/null -w "%{http_code}\n" "${BASE}/qa/${ROOT_FOLDER}/"
+```
+
+- **MUST** run public checks when the task is deployed or served through platform nginx (`location /qa/` → project preview proxy).
+- If **local passes** but **public fails** → check nginx, preview still running, `PORT` in `.preview.ports`, and that `PUBLIC_PATH` is exactly `/qa/{root folder name}` — then fix and re-run preview.
+- If **both fail** on `/qa/{root folder name}/api/health` but direct `API_PORT` works → fix browser/proxy paths (see § 4.2.1 — missing `/api` in URLs).
+
+#### Step 5 — If preview is not working, diagnose and fix (Required)
+
+**MUST** treat a failed preview as an open task — fix before reporting done.
+
+| Failure | Likely cause | Fix |
+|---------|--------------|-----|
+| `db:migrate` / Knex error at preview start | Wrong or missing `DB_NAME`, corrupt `knex_migrations` | Set `{db_name}` in `{monorepo}/.env`; `DB_HOST=db` in Docker; `db:init` or drop/recreate `{db_name}` (§ 3.1) |
+| Missing table / `ER_NO_SUCH_TABLE` | Pending or missing migration, wrong `DB_NAME` | `db:status` → `db:migrate`; add migration if needed; `SHOW TABLES` (§ 4.3 Step 3b A) |
+| DB route returns `500` / SQL error after health OK | Column/FK/query/seed issue | Fix migration/handler; `db:migrate`; re-verify tables; re-test routes (§ 4.3 Step 3b) |
+| API health 502 / connection refused | API not started, wrong `API_PORT` | `preview-api.log`; confirm `.preview.ports`; re-run preview |
+| Proxy 502, direct `API_PORT` health OK | `proxy.js` path or `PUBLIC_PATH` mismatch | § 4.2, § 4.2.1; rebuild with `--force` |
+| `404 Cannot POST /qa/…/v1/…` | Browser URL missing `/api` prefix | `apiFetch("/api/v1/...")` — § 4.2.1 |
+| Frontend 404 or wrong assets | Stale Turbo/webpack cache | `PUBLIC_PATH='/qa/{root folder name}' npm run build -- --force` then preview |
+| Local OK, public URL fails | Preview stopped or nginx path | Keep preview running; verify `PUBLIC_PATH='/qa/{root folder name}'` |
+
+Loop: `preview:stop` → fix (including DB when MySQL is used) → repeat Steps 1–3b until health, **schema (all tables)**, and all DB-backed APIs pass.
+
+#### Step 6 — Cleanup and report
+
+1. All checks pass → `npm run preview:stop` or `pnpm preview:stop`.
+2. In the task summary, **MUST** report: preview command used, local API health result, public API health URL + status (or note DB fix applied).
+
+- **MUST** expose `GET /api/health` on the API app.
+- **MUST NOT** skip verification or mark complete while API health returns 404/502 or preview did not start.
+- **MUST** always run `preview:stop` after verification.
+
+### Agent / skill flow
+
+```
+done coding
+  → PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run build -- --force (if path changed)
+  → PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run preview
+  → local: /api/health + /qa/{root folder name}/ + sample /api/v1/*
+  → public: https://imagent.identixweb.com/qa/{root folder name}/api/health + frontend /
+  → fail? → preview:stop → fix → repeat
+  → pass? → preview:stop → report URLs → done
+```
+
+## 5. Figma Design — `docs/figma-tree.md` (Frontend Only)
+
+**Path:** `{monorepo}/docs/figma-tree.md`  
+**Read when present:** `.cursor/skills/figma-tree-todo/reference/figma-tree-index.md`  
+**Human template (optional):** `.cursor/skills/figma-tree-todo/reference/figma-tree-md-template.md` — **agents do not auto-create the file**
+
+`docs/figma-tree.md` is the **frontend design index and requirements anchor**. It lists Figma file keys, screen links, node IDs, breakpoints, routes, and a **Requirements** section — nothing else.
+
+### Purpose & scope
+
+| In scope | Out of scope |
+|---|---|
+| Frontend UI screens, states, responsive breakpoints | Backend APIs, database, server config |
+| Links and node IDs already given in the project brief / PRD | Inventing Figma URLs not backed by the source file |
+| Design tokens, component inventory, page map | Rewriting `docs/` requirements or test specs |
+
+- **MUST** treat every Figma URL in `figma-tree.md` as the canonical target for that screen — implement frontend to match those frames.
+- **MUST NOT** use `figma-tree.md` for non-UI work (API design, migrations, infra).
+- **MUST NOT** delete or rewrite `figma-tree.md` during code-only tasks; update it only in an explicit **design phase** (or when the user asks). During implementation, **read** it — do not reshuffle links.
+
+### Figma MCP (required before design & before frontend)
+
+Connect via `.cursor/mcp.json` (`figma` server). When a dedicated Figma skill is added under `.cursor/skills/`, load it before MCP work; until then, follow the MCP tool steps below and `.cursor/rules/figma-tree-structure-checklist.mdc`.
+
+| Step | MCP tool | Purpose |
+|------|----------|---------|
+| 1 | `whoami` | Confirm Figma MCP is authenticated |
+| 2 | `get_metadata` | Verify `fileKey` and listed `node-id`s exist |
+| 3 | `get_design_context` / `get_screenshot` | Inspect layout, spacing, typography per screen link |
+| 4 | `get_variable_defs` / `search_design_system` | Reuse tokens and library components when available |
+| 5 | `use_figma` (write) | Create or update components and pages (requires write access) |
+
+- **MUST** verify each link in `figma-tree.md` with MCP before building or updating that screen in code.
+- If MCP is read-only, document the blocker in `figma-tree.md` and implement from verified screenshots/metadata — do not fabricate node IDs.
+
+### Discover first — do not assume Desktop / Tablet / Mobile folders (Required)
+
+**Before** creating or listing breakpoint rows, inspect what already exists:
+
+1. Check whether `docs/figma-tree.md` exists and read listed links only — **do not** invent Desktop/Tablet/Mobile rows if they are not there.
+2. Use Figma MCP (`get_metadata`, `get_design_context`) on the provided `fileKey` / `node-id` to see which frames, pages, and breakpoints already exist in the file.
+3. Record only what is verified — one link, many links, or none.
+
+| What the project gives | Agent action |
+|---|---|
+| **No `docs/figma-tree.md` yet** | **Ask user** for the file or Figma URL + scope — **do not auto-create**; use prototype-tree / MCP for requirements in summary only until index is provided |
+| **Single desktop (or one) frame link** | Treat desktop as **source of truth**; **auto-create** Tablet + Mobile layouts from it (Figma `use_figma` when write access, otherwise responsive CSS in `apps/web`) |
+| **Desktop + Tablet + Mobile links already listed** | Use each link as-is — do not duplicate or replace |
+| **Only marketing / reference frames** | Map the closest reference frame; note in `figma-tree.md` if app screens are code-derived |
+
+- **MUST NOT** require a pre-built “Desktop / Tablet / Mobile” folder structure in Figma or in `figma-tree.md` when the brief only supplies one design.
+- **MUST** derive responsive behavior from the desktop (or primary) frame when tablet/mobile links are missing: stack columns, shrink keypad, collapse side panels, touch targets ≥ 44px, breakpoints aligned with `test/*` or PRD.
+- After auto-creating Figma frames (write MCP), append new `node-id` URLs to `figma-tree.md` in the design phase only.
+
+### Design order — components first, then pages (Required)
+
+**Do not** jump straight to full-page frames. Follow this order:
+
+```
+0. Index               → read docs/figma-tree.md if present; if missing → ask user (no auto-create)
+1. Discover            → read figma-tree.md + MCP metadata (what links/breakpoints exist?)
+1. Tokens & foundations → colors, type, spacing (from Figma variables or reference frames)
+2. Atomic components    → Button, Input, Display, Key, etc. (Figma components)
+3. Composite components → Keypad, HistoryPanel, Shell (built from atoms)
+4. Primary page frame   → desktop (or the single frame link provided)
+5. Responsive variants  → tablet + mobile auto-derived ONLY if not already in Figma / figma-tree
+6. States (optional)    → error / empty / loading when required by PRD
+7. Update figma-tree.md → list only verified or newly created links (design phase only)
+8. Frontend code        → apps/web; CSS/media queries for breakpoints missing in Figma
+```
+
+| Phase | Figma | Code |
+|-------|-------|------|
+| Components | Create/reuse **components** first | `apps/web/src/components/` mirrors component set |
+| Primary page | Build from the **given** desktop (or sole) link | Base layout at ≥1024px (or PRD default) |
+| Responsive | Add tablet/mobile frames only when absent | `@media` / layout rules for 768px and &lt;768px |
+| States | Error / empty / loading when in scope | CSS/state classes |
+
+- **MUST** create shared Figma **components** before composing **page** frames.
+- Page frames **MUST** instance components (not detached one-off rectangles) when creating in Figma.
+- Responsive pages are **generated from the primary design**, not copied from a template tree.
+
+### `figma-tree.md` structure (minimum)
+
+List **only** screens that exist or were created — omit Tablet/Mobile lines when not applicable.
+
+```markdown
+# Figma Navigation Tree — {App Name}
+**File Key:** `{fileKey}`
+**Prototype Base URL:** https://www.figma.com/design/{fileKey}
+
+## Navigation Tree
+[ENTRY] / → Screen name
+├── [SCREEN] Screen — Desktop   → figma.com/design/...?node-id=...   ← source (required when provided)
+├── [SCREEN] Screen — Tablet    → ...   ← optional; add only after MCP verify or agent create
+├── [SCREEN] Screen — Mobile    → ...   ← optional; add only after MCP verify or agent create
+└── [STATE]  Screen — Error     → ...   ← optional; PRD-driven
+
+## Responsive note
+<!-- When only Desktop link exists: tablet/mobile implemented in code; Figma variants TBD -->
+
+## App routes ↔ test files
+| Route | Context | Test file |
+```
+
+- Each listed line **MUST** have a full Figma URL with `node-id` verified via MCP (or marked as code-only responsive).
+- **MUST NOT** paste placeholder `...` rows for breakpoints that do not exist yet.
+- Map every entry to a frontend route and, when tests exist, a `test/*.md` file.
+
+## Checklist Before Finishing Scaffold
+
+- [ ] Frontend app uses webpack (no alternate bundlers)
+- [ ] css-loader v7 + CSS Modules: `namedExport: false` on webpack css-loader rule; `*.module.css` + `import styles from "…"`
+- [ ] Root `package.json` exists with **`"packageManager"` always set** (exact manager@version)
+- [ ] Root `.env.example` with `PORT`, `PUBLIC_PATH`, `WEB_PORT`, `API_PORT`, `API_BASE_URL`
+- [ ] **MySQL backends:** `DB_NAME={db_name}`; Docker `DB_HOST=db`; preview `db:migrate`; `db:status` clean; all expected **tables** present; all DB-backed APIs passing
+- [ ] webpack reads root `.env` (`publicPath`, `DefinePlugin` for `__API_BASE_URL__`; prod endpoints use `/api/...` paths)
+- [ ] Root `preview` and `preview:stop` scripts + `scripts/preview-*.js` + `proxy.js` present
+- [ ] `preview-start.js` probes free `PORT` and `API_PORT` on `127.0.0.1`; passes both via shell env prefix (not spawn `env`)
+- [ ] `proxy.js` gates `/api` with explicit matcher (not `app.use('/api', …)` mount); listens on `127.0.0.1`
+- [ ] Preview starts API + proxy **in background**; `preview` command returns without blocking
+- [ ] API `/api/health` exists; preview verified with `PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run preview`
+- [ ] Local health: `127.0.0.1:{PORT}/qa/{root folder name}/api/health` and frontend `/qa/{root folder name}/` pass
+- [ ] Public health: `https://imagent.identixweb.com/qa/{root folder name}/api/health` and frontend `/qa/{root folder name}/` pass (when on IM platform)
+- [ ] `preview:stop` run after verification to free ports
+- [ ] `turbo.json` at root with `build.env` for `PUBLIC_PATH`, `API_BASE_URL`, `NODE_ENV`; apps under `apps/*`, shared code under `packages/*`
+- [ ] Checked `docs/figma-tree.md` + Figma MCP first — did not assume Desktop/Tablet/Mobile unless links exist
+- [ ] `docs/figma-tree.md` read when present (or user scope confirmed if missing) — frontend-only index; no placeholder breakpoint rows
+- [ ] If only desktop (or one frame) was given: tablet + mobile responsive layout auto-created (Figma and/or CSS)
+- [ ] Figma MCP used to verify `fileKey` and each listed `node-id` before frontend work
+- [ ] Figma **components** created before **page** frames (atoms → composites → primary page → responsive variants)
+- [ ] `figma-tree.md` lists only real screens/states with URL + node ID (or notes code-only responsive)
+- [ ] Frontend matches primary Figma link + responsive rules at 768px / mobile breakpoints
+

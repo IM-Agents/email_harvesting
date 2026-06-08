@@ -1,0 +1,67 @@
+---
+description: Shopify embedded apps with Polaris web components, App Bridge, and Admin API
+globs: **/app/**/*.ts,**/app/**/*.tsx,**/extensions/**/*,**/shopify*.ts,**/webhooks/**/*
+alwaysApply: false
+---
+
+# Shopify App Best Practices
+
+Canonical standards: this file (`shopify-stack.mdc`). External docs: [Shopify App Home](https://shopify.dev/docs/api/app-home), [Polaris web components](https://shopify.dev/docs/api/app-home/web-components).
+
+## Embedded setup
+
+- **MUST** load App Bridge + Polaris in app root (`app-bridge.js` with `data-api-key`, `polaris.js`).
+- **MUST** keep app embedded in admin; use App Bridge navigation—not full-page redirects that break iframe context.
+- **MUST NOT** expose `SHOPIFY_API_SECRET` or offline access tokens to the browser.
+
+## Polaris UI (`s-*` components)
+
+- **MUST** build App Home UI with Polaris web components (`<s-page>`, `<s-section>`, `<s-stack>`, `<s-button>`, …).
+- **MUST** structure pages: `<s-page heading="...">` → `<s-section>` → content.
+- **MUST** use `direction="inline"` for horizontal stacks (not `horizontal` / `vertical`).
+- **MUST** set `accessibilityLabel` on icon-only buttons; `tone="critical"` for destructive actions.
+- **SHOULD** put primary CTA in `slot="primary-action"` on `<s-page>`; use `loading` during async saves.
+- **MUST NOT** use MUI/Bootstrap/custom admin chrome in embedded screens.
+
+```tsx
+// ✅ GOOD
+<s-page heading="Products">
+  <s-button slot="primary-action" variant="primary">Add product</s-button>
+  <s-section heading="Catalog">
+    <s-stack gap="base">
+      <s-button variant="primary" loading={isSaving}>Save</s-button>
+    </s-stack>
+  </s-section>
+</s-page>
+
+// ✗ BAD
+<div className="custom-header">Products</motion.div>
+<s-stack direction="horizontal">...</s-stack>
+<button onClick={save}>Save</button>
+```
+
+## App Bridge
+
+- **MUST** check current App Bridge (and Polaris / Admin GraphQL when relevant) standards via the **`shopify-dev`** MCP server in `.cursor/mcp.json` before implementing or changing embedded UI—use `learn_shopify_api` first, then Shopify dev MCP doc tools as needed.
+- **MUST** use `useAppBridge()` from `@shopify/app-bridge-react`—not `window.shopify` in components.
+- **SHOULD** use `shopify.toast.show()` for merchant feedback; resource picker for product/collection selection.
+- **SHOULD** use save bar APIs when forms have unsaved changes.
+
+## Data and security
+
+- **MUST** call Admin API from **server** loaders/actions with `authenticate.admin(request)`.
+- **MUST** verify webhook HMAC via `authenticate.webhook(request)`.
+- **MUST** validate session/id token on every authenticated API route from the client.
+- **SHOULD** use GraphQL with only fields needed in UI; cursor pagination for lists.
+
+```tsx
+// ✗ BAD — secret or Admin API in browser
+const token = process.env.SHOPIFY_API_SECRET
+fetch('https://shop.myshopify.com/admin/api/...', { headers: { 'X-Shopify-Access-Token': token } })
+```
+
+## Anti-patterns
+
+- Admin UI without Polaris `s-*` components.
+- Skipping webhook signature verification.
+- New screens with `@shopify/polaris` React when repo standard is web components (unless legacy-only).

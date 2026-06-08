@@ -1,0 +1,223 @@
+---
+description: PostgreSQL best practices for advanced database design and optimization
+globs: **/*.sql, **/*.js, **/*.ts, src/**/*.sql, migrations/**/*.sql
+---
+
+# PostgreSQL Best Practices
+
+## Database Design
+- Use proper normalization (3NF minimum)
+- Leverage PostgreSQL-specific features
+- Use proper data types (JSONB, Arrays, ENUM)
+- Implement proper constraints and validation
+- Design for performance and scalability
+- Plan for growth and optimization
+
+## Advanced Data Types
+- Use JSONB for semi-structured data
+- Implement array types appropriately
+- Use ENUM for fixed value sets
+- Use UUID for distributed IDs
+- Use RANGE types for ranges
+- Choose appropriate composite types
+
+## Table Structure
+- Use BIGSERIAL for primary keys
+- Implement proper column data types
+- Use generated columns where appropriate
+- Set proper default values
+- Add audit timestamps (created_at, updated_at)
+- Use constraints for data integrity
+
+## Naming Conventions
+- Use snake_case for table and column names
+- Use plural form for table names
+- Prefix boolean columns with is/has/should
+- Name foreign keys as parent_table_id format
+- Use idx_ prefix for indexes
+- Use meaningful names for all objects
+
+## Constraints and Validation
+- Use primary key on every table
+- Implement foreign key constraints properly
+- Use unique constraints for unique data
+- Add check constraints for validation
+- Use NOT NULL for required fields
+- Use domains for reusable types
+
+## Indexing Strategy
+- Use B-tree indexes for standard queries
+- Use GIN indexes for JSONB and arrays
+- Use GiST indexes for geometric data
+- Create partial indexes for filtered data
+- Use expression indexes for computed columns
+- Monitor and maintain index performance
+
+## JSONB Operations
+- Store complex data in JSONB
+- Index JSONB fields with GIN
+- Query JSONB efficiently
+- Update JSONB data properly
+- Use JSONB aggregation functions
+- Optimize JSONB performance
+
+## Window Functions
+- Use window functions for analytics
+- Implement ranking functions properly
+- Use aggregate window functions
+- Apply frame specifications correctly
+- Optimize window function queries
+- Document complex window logic
+
+## Common Table Expressions
+- Use CTEs for complex queries
+- Implement recursive CTEs for hierarchies
+- Use multiple CTEs for clarity
+- Optimize CTE performance
+- Avoid excessive CTE nesting
+- Document CTE purposes
+
+## Full-Text Search
+- Set up full-text search indexes
+- Use proper text search configuration
+- Optimize full-text queries
+- Implement ranking properly
+- Use tsvector efficiently
+- Monitor search performance
+
+## Materialized Views
+- Create materialized views for expensive queries
+- Refresh views appropriately
+- Use concurrent refresh
+- Index materialized views
+- Monitor view maintenance
+- Document refresh schedules
+
+## Query Optimization
+- **MUST** list only needed columns in every `SELECT`—never use `SELECT *`
+- Analyze query execution plans with EXPLAIN ANALYZE
+- Optimize slow queries
+- Use proper JOIN strategies
+- Avoid unnecessary functions in WHERE
+- Implement proper subqueries
+- Use query statistics
+
+## Transaction Management
+- Use transactions for related operations
+- Set proper isolation levels
+- Implement proper error handling
+- Use savepoints appropriately
+- Monitor transaction performance
+- Handle deadlocks properly
+
+## Database Connections
+- Implement connection pooling (PgBouncer)
+- Set proper connection limits
+- Handle connection failures
+- Monitor active connections
+- Implement proper timeouts
+- Clean up connections properly
+
+## Security
+- Use parameterized queries (prevent SQL injection)
+- Implement proper user roles and privileges
+- Use SSL for connections
+- Encrypt sensitive data
+- Validate all input data
+- Implement row-level security
+
+## Performance Tuning
+- Configure shared_buffers properly
+- Set work_memory appropriately
+- Configure effective_cache_size
+- Tune maintenance_work_mem
+- Implement parallel query execution
+- Monitor system performance
+
+## Backup and Recovery
+- Implement automated backups
+- Use pg_dump for logical backups
+- Test backup restoration regularly
+- Document recovery procedures
+- Monitor backup success
+- Plan disaster recovery
+
+## Monitoring and Logging
+- Use pg_stat_statements for query analysis
+- Monitor slow queries
+- Set up performance monitoring
+- Track resource usage
+- Configure log levels
+- Set up alerting systems
+
+## Replication and High Availability
+- Use streaming replication
+- Implement proper replication slots
+- Monitor replication lag
+- Handle replication failures
+- Configure failover properly
+- Use read replicas effectively
+
+## Schema Changes
+- Use proper migration management
+- Implement zero-downtime migrations
+- Test migrations thoroughly
+- Document all changes
+- Use proper versioning
+- Plan for rollbacks
+
+## Maintenance Operations
+- Run VACUUM regularly
+- Analyze table statistics
+- Reindex as needed
+- Monitor bloat
+- Clean up old data
+- Plan maintenance windows
+
+## Best Practices
+- Follow PostgreSQL best practices
+- Use proper SQL syntax
+- Implement error handling
+- Use transactions properly
+- Document database design
+- Keep performance metrics
+
+## Development Environment
+- Use consistent data types
+- Implement proper seeding
+- Use fixtures for testing
+- Isolate test databases
+- Reset data between tests
+- Document setup procedures
+
+## Production Considerations
+- Use proper production configurations
+- Implement monitoring and alerting
+- Set up log aggregation
+- Monitor disk usage
+- Plan for capacity growth
+- Document procedures
+
+## Code Standards
+- Use proper SQL formatting
+- Add comments for complex queries
+- Use meaningful names
+- Follow consistent patterns
+- Document query purposes
+- Implement proper error handling
+
+## Common Pitfalls to Avoid
+- Never use `SELECT *`—list only needed columns in every `SELECT`
+- Avoid storing sensitive data unencrypted
+- Don't ignore foreign key constraints
+- Avoid N+1 query patterns
+- Don't skip proper indexing
+- Avoid synchronous operations for large datasets
+
+## Advanced Features
+- Use triggers appropriately
+- Implement custom functions
+- Use extensions wisely
+- Implement proper partitioning
+- Use event triggers for logging
+- Leverage PostgreSQL-specific features

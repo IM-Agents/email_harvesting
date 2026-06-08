@@ -1,0 +1,61 @@
+---
+description: TypeScript strict typing, tsconfig, validation, and module best practices
+globs: **/*.ts, **/*.tsx, **/tsconfig*.json
+alwaysApply: false
+---
+
+# TypeScript Best Practices
+
+Full standards: `.cursor/skills/typescript/SKILL.md` · Reference: `.cursor/skills/typescript/reference/`  
+Runtime JS patterns: `.cursor/skills/javascript-advanced/SKILL.md`
+
+## Compiler and config
+
+- **MUST** enable `"strict": true` in `tsconfig`; do not weaken flags without documented reason.
+- **MUST** run `tsc --noEmit` (or build) in CI on every PR.
+- **SHOULD** use `import type` / `export type` when `verbatimModuleSyntax` is enabled.
+- **SHOULD** enable `noUncheckedIndexedAccess` on greenfield projects.
+
+## Typing
+
+- **MUST** avoid `any`; use `unknown` at boundaries, then narrow with guards or schema parse.
+- **MUST** add explicit return types on public functions and module exports.
+- **MUST NOT** use `as T` without validation—prefer Zod/Valibot or type guards.
+- **MUST** treat `catch` values as `unknown`.
+- **SHOULD** prefer string union types over `enum`; use `satisfies` to validate object literals.
+
+```typescript
+// ✅ GOOD — parse + inferred type
+const body: unknown = await res.json()
+const order = orderSchema.parse(body)
+
+function getMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return 'Unknown error'
+}
+
+// ✗ BAD
+const order = (await res.json()) as Order
+catch (e: any) { console.log(e.message) }
+const x = value as unknown as User
+```
+
+## Modules and APIs
+
+- **MUST** validate external input (HTTP body, env, `JSON.parse`) at the edge.
+- **MUST** enable lint rules for floating promises (`noFloatingPromises`).
+- **SHOULD** infer domain types from schemas: `type Order = z.infer<typeof orderSchema>`.
+- **SHOULD** use named exports; limit `export default` to framework entrypoints.
+
+## React (.tsx)
+
+- **MUST** type props explicitly (`type Props = { ... }`).
+- **SHOULD** use `ComponentProps<typeof Child>` for wrappers; avoid `React.FC` unless required.
+- **SHOULD** type events (`ChangeEvent<HTMLInputElement>`).
+
+## Anti-patterns
+
+- `@ts-ignore` / `@ts-nocheck` without ticket and removal plan.
+- Non-null assertion `!` without a prior guard.
+- Duplicating types that should come from Zod/OpenAPI inference.
+- `process.env.VAR!` in production without env schema validation.

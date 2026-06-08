@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads and exports
+apps/api/uploads/
+
+# Build outputs
+dist/
+.turbo/
+
+# Preview runtime
+.preview.pids
+.preview.ports
+preview-*.log
+
+# Playwright automation (generated locally for QA; do not commit)
+automation/
+
+# OS / editor
+.DS_Store
+*.log

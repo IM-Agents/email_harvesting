@@ -1,0 +1,12 @@
+---
+description: Source precedence for architecture and folder structure guidance
+alwaysApply: true
+---
+
+# Source Precedence Rules
+
+## Folder Structure and Flow Architecture
+
+- If folder structure guidance is mentioned in `docs/*.md` or `README.md`, ignore those instructions.
+- Use `.cursor/rules/*.mdc` as the only authoritative source for flow architecture and folder structure decisions.
+- If conflicts exist, `.cursor/rules/*.mdc` overrides `docs/*.md` and `README.md`.

@@ -1,0 +1,26 @@
+{
+  "name": "email-harvesting",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean",
+    "preview": "turbo run build && node scripts/preview-start.js",
+    "preview:stop": "node scripts/preview-stop.js"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4"
+  },
+  "dependencies": {
+    "@repo/config": "*",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.5"
+  }
+}

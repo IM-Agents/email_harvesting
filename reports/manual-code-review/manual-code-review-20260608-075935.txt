@@ -1,0 +1,52 @@
+## Summary
+Approve — Blocker and Major security issues found in the initial pass were fixed (committed credential placeholders, production JWT enforcement, safer auth bootstrap). Preview health, login, batch upload/processing, reports, and admin settings were verified locally.
+
+## Findings
+
+(No open Blockers or Majors after auto-fix loop — final pass.)
+
+### [Blocker] — Real third-party credentials in committed `.env.example` (FIXED)
+- **File:** `.env.example:17-27`
+- **Rule:** `code-review SKILL §8` / `env-variables.mdc` — secrets only in gitignored `.env`
+- **Issue:** Snov, Apollo, and LinkedIn passwords and emails were committed in the example env file.
+- **Fix:** Replaced with empty keys and comments; real values belong only in local `.env`.
+
+### [Blocker] — Real credentials in `docs/environment-variables.md` (FIXED)
+- **File:** `docs/environment-variables.md:15-32`
+- **Rule:** `code-review SKILL §8`
+- **Issue:** Documentation committed live integration passwords.
+- **Fix:** Redacted to empty placeholders with instructions to set values in gitignored `.env`.
+
+### [Major] — Weak JWT fallback usable in production (FIXED)
+- **File:** `apps/api/src/services/auth.service.js:27-31`, `apps/api/src/middleware/auth.middleware.js:13`
+- **Rule:** `nodejs-stack.mdc` Security / `code-review SKILL §8`
+- **Issue:** Missing `JWT_SECRET` fell back to a hardcoded dev string, weakening token signing if misconfigured in production.
+- **Fix:** `ensureJwtSecret()` fails API boot when `NODE_ENV=production` and secret is missing or < 32 chars; auth paths return 500 instead of signing with dev default in production.
+
+### [Minor] — `process.env.NODE_ENV` outside config layer (FIXED)
+- **File:** `apps/api/src/middleware/error.middleware.js:5`
+- **Rule:** `env-variables.mdc` — no raw `process.env` outside config
+- **Issue:** Error middleware read `NODE_ENV` directly from `process.env`.
+- **Fix:** Import validated `env` from `../config/env`.
+
+### [Minor] — Uncaught `JSON.parse` on corrupted auth storage (FIXED)
+- **File:** `apps/web/src/contexts/AuthContext.jsx:7-10`
+- **Rule:** `javascript-stack.mdc` Error handling
+- **Issue:** Invalid `localStorage` JSON could throw during initial render and break the app shell.
+- **Fix:** Wrapped parse in try/catch and clear stale keys on failure.
+
+## Verified ✓
+- Parameterized Knex queries throughout API services; batch/domain access scoped by `user_id`.
+- All protected API routers use `authenticate`; admin routes use `requireRole("admin")`.
+- No `SELECT *`, `innerHTML`, `eval`, or string-built SQL in application code.
+- Preview verified: `GET /api/health` (direct + proxy), login, dashboard, upload, batch start/complete, report, admin settings.
+- `npm run db:migrate` clean on `email_harvesting_app`; worker mock pipeline produces contacts.
+- `.env.example` uses placeholders; integration secrets documented for local `.env` only.
+- React lists use stable entity ids as keys (not array indices on reorderable data).
+
+## Follow-ups (non-blocking)
+- **Security Hotspot:** `CORS_ORIGIN` defaults to `*` in `apps/api/src/app.js` — tighten for production deploy.
+- **Phase 2:** Replace mock worker with Playwright Snov/Apollo/LinkedIn automation and Python website crawler per README.
+- **Figma:** Complete remaining page frames in file `q0ikOnEhEtl5wsnqI72SE0` when MCP quota allows; update `docs/figma-tree.md` node URLs.
+- **Dev seed:** Default admin `admin@emailharvest.local` / `admin123` is intentional for local QA — rotate before any shared environment.
+- **CodeRabbit:** Full automated report at `reports/coderabbit/coderabbit-review-20260608-074139.txt` (63 findings — triage separately; not auto-applied per AGENTS.md workflow).

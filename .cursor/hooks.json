@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "hooks": {
+        "sessionEnd": [
+            {
+                "type": "command",
+                "command": "bash .cursor/hooks/session-end-git-sync.sh",
+                "timeout": 120
+            }
+        ],
+        "stop": [
+            {
+                "type": "command",
+                "command": "bash .cursor/hooks/session-end-git-sync.sh",
+                "timeout": 120,
+                "loop_limit": 1
+            }
+        ]
+    }
+}

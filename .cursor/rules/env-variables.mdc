@@ -1,0 +1,544 @@
+---
+description: Shared env config via packages/config — load order, NODE_ENV files, .env.example fallback
+alwaysApply: true
+---
+
+# Environment Variables Rules
+
+All apps, scripts, and webpack configs **MUST** use the shared env package — never scatter `process.env.*` reads across the repo.
+
+## 1. Shared Config Package (`packages/config`)
+
+Create (or extend) `packages/config` as the **single source of truth** for env loading and validated config.
+
+```
+packages/config/
+├── package.json          ← name: "@repo/config", exports env entrypoints
+├── src/
+│   ├── loadEnv.js        ← dotenv loader (priority + env files + .env.example fallback)
+│   ├── env.js            ← schema, defaults, exported `env` object
+│   └── index.js          ← re-exports loadEnv + env
+└── .env.schema.json      ← optional: documents all keys for .env.example sync
+```
+
+### `packages/config/package.json`
+
+```json
+{
+  "name": "@repo/config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./env": "./src/env.js",
+    "./loadEnv": "./src/loadEnv.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "joi": "^17.0.0"
+  }
+}
+```
+
+### App-level `config/` folder (Required in every app)
+
+Every folder under `apps/*` (and any standalone service package) **MUST** have a **`config/`** directory for all env-related code. No env logic in `routes/`, `controllers/`, `components/`, or webpack files except via `config/`.
+
+```
+apps/api/
+├── src/
+│   ├── index.js
+│   ├── app.js
+│   └── config/
+│       ├── index.js      ← re-exports env (+ loadEnv side effect)
+│       └── env.js        ← loadEnv + Joi (shared + app keys) → export env
+
+apps/web/
+├── src/
+│   └── config/
+│       ├── index.js
+│       └── env.js
+├── webpack.config.js     ← imports from ./src/config only
+└── .env.example          ← app-only keys (optional; root .env.example is primary)
+```
+
+| Layer | Role |
+|---|---|
+| `packages/config` | Shared `loadEnv`, base Joi schema, dotenv file resolution |
+| `apps/{name}/src/config/` | Calls `loadEnv({ appName })`, merges app-specific keys, exports `env` |
+| Rest of app | `import { env } from "./config/env"` or `require("./config")` only |
+
+- **MUST** add `"@repo/config": "*"` only in each app's `config/` files (not scattered).
+- **MUST NOT** import `@repo/config` from routes, services, components, or middleware — only from `apps/*/config/`.
+- **MUST NOT** call `dotenv.config()` outside `packages/config/src/loadEnv.js`.
+- **MUST NOT** read `process.env.*` outside `packages/config` and `apps/*/config/`.
+
+### `apps/api/src/config/env.js`
+
+```js
+const { loadEnv } = require("@repo/config/loadEnv");
+const Joi = require("joi");
+
+loadEnv({ appName: "api" }); // must run before requiring validated env
+
+const { env: sharedEnv } = require("@repo/config/env");
+
+const appEnvSchema = Joi.object({
+  // App-only keys; shared keys (PORT, API_PORT, …) come from @repo/config
+  DATABASE_URL: Joi.string().uri().optional(),
+});
+
+const { value: appEnv, error } = appEnvSchema.validate(process.env, {
+  abortEarly: false,
+  convert: true,
+  stripUnknown: true,
+});
+if (error) throw new Error(`Invalid api env: ${error.message}`);
+
+const env = { ...sharedEnv, ...appEnv };
+module.exports = { env };
+```
+
+### `apps/api/src/config/index.js`
+
+```js
+module.exports = require("./env");
+```
+
+### Usage in app code (always via `config/`)
+
+```js
+// apps/api/src/index.js
+const { env } = require("./config/env");
+app.listen(env.API_PORT);
+```
+
+```js
+// apps/web/webpack.config.js
+const { env } = require("./src/config/env");
+module.exports = { devServer: { port: env.WEB_PORT }, /* ... */ };
+```
+
+---
+
+## 2. Variable Resolution Order (Required)
+
+For **each** env key, resolve in this order:
+
+1. **Shell / CLI / CI** — `PUBLIC_PATH='/qa/{root folder name}' npm run build` (non-empty `process.env` before `loadEnv`; `{root folder name}` = repo basename) → **highest priority; never overwritten**
+2. **Value from loaded `.env` file** (after `loadEnv()` runs, `override: false`)
+3. **Schema default** in `packages/config/src/env.js` (Joi `.default()`)
+4. **`.env.example` fallback** — if `.env` is missing or a key is still unset after step 3, load root `.env.example` (and app `.env.example` if `appName` set)
+
+### CLI restore in `loadEnv()` (Required)
+
+Capture non-empty shell values **before** dotenv, restore **after** all files load:
+
+```js
+const cli = {}
+for (const key of REQUIRED_KEYS) {
+  if (process.env[key] !== undefined && process.env[key] !== "") {
+    cli[key] = process.env[key]
+  }
+}
+// … dotenv.config({ override: false }) for each file …
+Object.assign(process.env, cli)
+```
+
+See also `turbo-env-cache.mdc` — Turbo may skip webpack on cache hit unless `env` is listed in `turbo.json` or you run `--force`.
+
+### `PUBLIC_PATH` format
+
+- **MUST** be a URL path prefix: `/`, `/myapp`, `/myapp/` (leading slash).
+- **MUST NOT** use a full origin for preview (`http://localhost:4001/qa/{root folder name}`) unless you intentionally set CDN-style `output.publicPath`.
+- Preview URL: `http://localhost:{PORT}{PUBLIC_PATH}` (path only, not `PORT` + full URL).
+
+```js
+// packages/config/src/env.js — pattern per key
+function resolveEnv(name, schemaDefault) {
+  const raw = process.env[name];
+  if (raw !== undefined && raw !== "") return raw;
+  return schemaDefault;
+}
+```
+
+`loadEnv()` runs **before** `env` is parsed. Parsing uses `process.env` after files are merged without clobbering pre-set values.
+
+---
+
+## 2b. README & docs env pickup (Required)
+
+When scaffolding, planning, or fixing env for `{monorepo}`:
+
+### Read first
+
+| Source | Extract |
+|--------|---------|
+| `README.md` | All `VAR=value`, env tables, setup sections |
+| `docs/**/*.md` | Integration env blocks, deployment vars |
+| `.env.example` | Committed defaults; non-empty for keys needed in dev — see § Empty value + comment |
+| `plan/plan-*.md` § Environment | Task-specific vars |
+
+### Rules
+
+- **MUST** copy **name and value** from README/docs into plan and into `.env.example` when docs provide both.
+- **MUST NOT** set `VAR=` or `VAR=""` when documentation or `.env.example` already gives a value.
+- **When README/docs list a name but no value** — record **key only** in plan `.md` files (see § Docs empty → plan .md); wire `.env.example` at **implement** time with comment (§ Empty value + comment).
+- **MUST** ensure `{monorepo}/.env` (local, gitignored) has non-empty values for all keys needed to run preview/API before claiming setup done.
+- **MUST** sync new keys: `packages/config/src/env.js` (Joi) + root `.env.example` + README/docs mention if product-specific.
+- **Secrets:** use doc placeholders in `.env.example` (`your_figma_token`, `changeme`); real tokens only in `.env` — never empty in **local `.env`** if app fails without them.
+
+### Docs empty → plan `.md` (planning phase)
+
+When README/docs give the **variable name only** (no value, empty cell, or “set in production”):
+
+| Where | Rule |
+|-------|------|
+| `plan/plan-*.md` § Environment | Add **key only** — exact name from docs; **MUST NOT** invent a Value |
+| `plan/features/*.md` | Same — list key + Purpose + “prod: set value at deploy” |
+| Value column in plan `.md` | Leave empty or `—` — **never** guess `your_token`, `changeme`, etc. in the plan file |
+
+```markdown
+## Environment variables
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| STRIPE_SECRET_KEY | — | Checkout webhooks — prod: set real value at deploy |
+| FIGMA_TOKEN | abc_from_readme | Prototype-tree API — from README § Figma |
+```
+
+- **MUST** use the **exact key** from README/docs — no renamed or generic keys.
+- **MUST NOT** add empty keys to `.env.example` during planning only — add when implementing (§ 2c).
+
+### Empty value + comment (implement → `.env.example`)
+
+When README/docs (or the user) give the **variable name only** and no value — **at implement time** add to `.env.example`:
+
+| File | Rule |
+|------|------|
+| Plan `.md` | **Key only** — see § Docs empty → plan `.md` |
+| `.env.example` | **MAY** leave value empty — **MUST** add a `#` comment on the line **above** |
+| Local `.env` | **MUST** use non-empty dev placeholder **or** omit key only if optional at boot (Joi `.optional()`) |
+| Plan § Environment | **Purpose** column required; note **prod: set real value** |
+
+**Comment MUST include:**
+
+1. **What it is used for** (integration, feature, deploy target)
+2. **Where to set in production** — e.g. “Set in production / CI / host env before deploy”
+3. **Local dev** — optional vs required; if required, say use placeholder in `.env` only
+
+```bash
+# Production: Stripe secret for checkout webhooks. Set real key in prod/CI — optional for local preview unless testing payments.
+STRIPE_SECRET_KEY=
+
+# Production: SMTP host for password-reset emails. Required in prod; local dev may use Mailhog or leave unset if email is mocked.
+SMTP_HOST=
+
+# Dev OK: Figma personal access token for prototype-tree API. Use your token in .env — see README § Figma setup.
+FIGMA_TOKEN=your_figma_token
+```
+
+- **MUST NOT** add a bare `VAR=` with no comment when the value is empty.
+- **MUST** match comment style to existing `.env.example` in `{monorepo}` when present.
+
+### Merge priority (when values differ)
+
+1. Shell / Docker / CI (wins at runtime — `loadEnv` `override: false`)
+2. `{monorepo}/.env` (local)
+3. **README.md / docs** (when adding or fixing missing keys)
+4. `.env.example`
+5. Joi defaults in `env.js`
+6. Platform rule defaults (`database-common-stack.mdc`, `architecture.mdc`)
+
+### Agent checklist
+
+- [ ] Scanned README + docs for env blocks before editing `.env*`
+- [ ] Plan `.md`: keys from docs; **value column empty (`—`) when docs had no value** — no invented values in plan files
+- [ ] `.env.example`: non-empty for required dev keys; empty keys have **purpose + prod** comment above (at implement time)
+- [ ] Local `.env` filled from example + docs before preview / `db:init`
+
+---
+
+## 2c. New / additional env — use project env stack (Required)
+
+When README, docs, or a feature adds **new** variables (not already in the project):
+
+**MUST** wire them through the **existing project env system** — never ad-hoc `process.env.*` reads in routes, services, or components.
+
+### Env naming (Required)
+
+**MUST NOT** invent generic names (e.g. `NEW_VAR`, `MY_KEY`, `API_KEY_2`). Names **MUST** come from:
+
+| Priority | Source |
+|----------|--------|
+| 1 | Exact name in **`README.md` / `docs/**`** (e.g. `FIGMA_TOKEN`, `CLICKUP_API_KEY`, `DB_NAME`) |
+| 2 | Existing **`packages/config/src/env.js`** / `.env.example` in `{monorepo}` |
+| 3 | Same pattern as sibling keys in that file (e.g. `GITHUB_TOKEN` next to `GITHUB_USERNAME`) |
+
+- Reuse an **existing** project key when the integration is the same — do not duplicate under a new name.
+- If docs use a different name than the repo, **align to the project** `.env.example` and note the doc alias in plan § Environment.
+- Placeholder in rules/docs: `{ENV_KEY}` means “the real name from README/docs” — not a literal variable name.
+
+### Before adding a key
+
+| Check | Path |
+|-------|------|
+| Shared keys already defined? | `packages/config/src/env.js`, root `.env.example` |
+| App-only keys? | `{backend_app}/src/config/env.js`, `{frontend_app}/src/config/env.js` |
+| Standalone backend (no monorepo config)? | `{backend_app}/src/config/index.js` or `app/backend/src/config/index.js` |
+| DB-related? | `applyProjectDatabaseEnv`, `database-common-stack.mdc`, `knexfile.js` |
+
+### Add a new variable (all steps)
+
+| Step | Action |
+|------|--------|
+| 1 | **Keep** all existing project env keys — new vars **extend** the stack, do not replace `loadEnv` / `@repo/config` |
+| 2 | Add Joi entry in **`packages/config/src/env.js`** (shared) **or** `apps/{name}/src/config/env.js` (app-only) |
+| 3 | Add row to root `.env.example` and/or app `.env.example` — value from README/docs; if **no value in docs**, empty OK **with comment** (§ 2b Empty value + comment) |
+| 4 | Add to local `{monorepo}/.env` (gitignored) — **non-empty** if key required at boot; prod-only keys may stay unset locally when optional |
+| 5 | If `DB_*` or platform key — follow § Database env priority + `{db_name}` rules |
+| 6 | Call sites use `const { env } = require("./config/env")` — **not** raw `process.env` |
+| 7 | Preview/webpack/proxy: ensure `loadEnv()` runs before `env` is read |
+| 8 | Key already in plan `.md` from docs; update plan Value if user supplies one later |
+
+### Shared vs app-only
+
+| Key used by | Register in |
+|-------------|-------------|
+| API + web + scripts | `packages/config/src/env.js` + root `.env.example` |
+| One app only | That app's `src/config/env.js` + app `.env.example` |
+| Build-time browser (`DefinePlugin`) | `{frontend_app}/src/config/env.js` + webpack imports config only |
+
+### Anti-patterns
+
+```js
+// ❌ FIGMA_TOKEN in .env only — never registered in env.js / config
+const token = process.env.FIGMA_TOKEN;
+
+// ❌ CLICKUP_API_KEY read in route — bypasses project env
+router.get("/", () => fetch(process.env.CLICKUP_API_URL));
+
+// ❌ Invented name not in README or .env.example
+const x = process.env.MY_CUSTOM_API_KEY;
+
+// ✅ Names from README/docs + packages/config or app config/env.js + .env.example
+const { env } = require("./config/env");
+fetch(env.CLICKUP_API_URL);
+```
+
+- **MUST** merge doc/README values **with** existing `.env.example` keys — do not drop platform vars (`PORT`, `DB_*`, `PUBLIC_PATH`) when adding feature env.
+- **MUST** use **SCREAMING_SNAKE_CASE** and **match names already used** in the project or documented in README/docs.
+
+---
+
+## 3. When to Call `dotenv` (`loadEnv`)
+
+| Situation | Action |
+|---|---|
+| All required keys already in `process.env` | **Skip** `dotenv.config` entirely |
+| Any required key missing | Call `loadEnv()` once at process entry |
+| `.env` file missing | Load `.env.example` instead (warn in development only) |
+
+```js
+// packages/config/src/loadEnv.js — simplified behavior
+function loadEnv({ rootDir, appName } = {}) {
+  const root = rootDir ?? findMonorepoRoot();
+  const required = ["PORT", "PUBLIC_PATH", "API_PORT"]; // extend in env.js
+
+  const cli = {};
+  for (const key of required) {
+    if (process.env[key] !== undefined && process.env[key] !== "") {
+      cli[key] = process.env[key];
+    }
+  }
+
+  const allSet = required.every((k) => process.env[k] !== undefined && process.env[k] !== "");
+  if (allSet) return { source: "process.env" };
+
+  const files = resolveEnvFiles(root, appName); // see §4
+  for (const file of files) {
+    if (fs.existsSync(file)) dotenv.config({ path: file, override: false });
+  }
+
+  const stillMissing = required.filter((k) => !process.env[k]);
+  if (stillMissing.length) {
+    const example = path.join(root, ".env.example");
+    if (fs.existsSync(example)) dotenv.config({ path: example, override: false });
+  }
+
+  Object.assign(process.env, cli); // shell/CLI wins for REQUIRED_KEYS
+
+  applyProjectDatabaseEnv(root); // see § Database env priority
+}
+```
+
+- **`override: false`** — never replace variables already set in `process.env`.
+- Call `loadEnv()` **once** at the top of: API entry, webpack config, `preview-start.js`, `proxy.js`, test setup.
+
+### Database env priority (Required — `@repo/config/loadEnv`)
+
+After `dotenv.config({ override: false })` for each file:
+
+| Variable | Winner | Reason |
+|----------|--------|--------|
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` | **Shell / Docker** if already set | IM platform container injects `DB_HOST=db` |
+| `DB_NAME` | **`{monorepo}/.env` only** | Child app must not inherit parent `{platform_db_name}` |
+
+```js
+// packages/config/src/loadEnv.js — after all dotenv loads, before CLI restore for PORT/PUBLIC_PATH
+function applyProjectDatabaseEnv(rootDir) {
+  const rootEnv = path.join(rootDir, ".env");
+  if (!fs.existsSync(rootEnv)) return;
+  const parsed = dotenv.parse(fs.readFileSync(rootEnv));
+  if (parsed.DB_NAME) process.env.DB_NAME = parsed.DB_NAME;
+}
+```
+
+- **MUST** implement `applyProjectDatabaseEnv` (or equivalent) in shared `loadEnv` for monorepos on IM platform.
+- **MUST NOT** let parent `DB_NAME={platform_db_name}` override `{monorepo}/.env` `{db_name}`.
+- **MUST NOT** let `{monorepo}/.env` `DB_HOST=localhost` override Docker `DB_HOST=db` when `process.env.DB_HOST` was set before `loadEnv`.
+
+**Examples:** `{root folder name}` = `login`, `{db_name}` = `login_app` in `{monorepo}/.env` — see `{monorepo}/README.md` for product-specific values.
+
+---
+
+## 4. Environment- & Server-Specific Files
+
+Load files in order (later files fill gaps only; never override existing `process.env`):
+
+| Order | File | When |
+|---|---|---|
+| 1 | `{root}/.env` | Always (if exists) |
+| 2 | `{root}/.env.{NODE_ENV}` | `development` \| `production` \| `test` |
+| 3 | `{root}/.env.local` | Local overrides (gitignored) |
+| 4 | `{root}/.env.{NODE_ENV}.local` | Local per-environment (gitignored) |
+| 5 | `{root}/apps/{appName}/.env` | App-specific (optional; loaded when `loadEnv({ appName })` from `apps/*/config/`) |
+| 6 | `{root}/apps/{appName}/.env.example` | App fallback template |
+| 7 | `{root}/.env.example` | **Fallback** when root `.env` missing or keys still unset |
+
+`NODE_ENV` defaults to `development` when unset. Production deploys set `NODE_ENV=production` in the host/ container.
+
+**Server-wise**: API uses `API_PORT` / `PORT`; web devServer uses `WEB_PORT`; proxy uses root `PORT` + `PUBLIC_PATH`. All names are defined once in `packages/config/src/env.js`.
+
+**Preview**: `preview-start.js` captures CLI `PUBLIC_PATH` / `PORT` / `API_PORT` before `loadEnv()`, probes `127.0.0.1` for free **`PORT`** (default `8080`) and **`API_PORT`** (default `4000`, scan upward if busy), writes `.preview.ports`, then spawns api + proxy with inline shell env (`PUBLIC_PATH='…' PORT=… API_PORT=…`) — not a spawn `env` object. Browser: `__API_BASE_URL__` = `PUBLIC_PATH` in prod; fetch `/{PUBLIC_PATH}/api/v1/...` (endpoint must include `/api`). See `architecture.mdc` § 4.2.1; full scripts: `react-node-structure.md` → **Reference — preview scripts**.
+
+---
+
+## 5. Validated `env` Export (`packages/config/src/env.js`)
+
+```js
+const Joi = require("joi");
+
+const envSchema = Joi.object({
+  NODE_ENV: Joi.string()
+    .valid("development", "test", "production")
+    .default("development"),
+  PORT: Joi.number().default(8080),
+  PUBLIC_PATH: Joi.string().default("/"),
+  WEB_PORT: Joi.number().default(3001),
+  API_PORT: Joi.number().default(4000),
+  API_BASE_URL: Joi.string().default("http://localhost:4000"),
+}).unknown(true);
+
+// loadEnv() must run before this module is first required
+const { value: env, error } = envSchema.validate(process.env, {
+  abortEarly: false,
+  convert: true, // coerce string env vars to numbers
+});
+
+if (error) {
+  throw new Error(`Invalid environment: ${error.message}`);
+}
+
+module.exports = { env, envSchema };
+```
+
+- **Shared** variables: add in `packages/config/src/env.js` + root `.env.example`.
+- **`DB_NAME` (MySQL):** if Joi defines a `.default()`, it **MUST** match `{monorepo}/.env.example` for **that** product — do not hardcode one app's `{db_name}` in a shared template copied to every monorepo; prefer unset default + `.env.example` as source of truth.
+- **App-only** variables: add in `apps/{name}/src/config/env.js` + `apps/{name}/.env.example`.
+- Frontend webpack: `require("./src/config/env")` for `publicPath`, `DefinePlugin`, devServer `port` / `proxy`.
+- **`__API_BASE_URL__`** (webpack `DefinePlugin`, browser only):
+  - **dev:** `"/api"`
+  - **prod subpath:** normalized `PUBLIC_PATH` = `/qa/{root folder name}` — **not** `API_BASE_URL` (`http://localhost:4000`)
+  - **prod root:** `"/api"` when `PUBLIC_PATH` is `/` or empty
+  - **Endpoints** passed to `apiFetch` / `fetch` **MUST** include the `/api` prefix (e.g. `/api/v1/...`), because the base is `PUBLIC_PATH` without `/api` appended.
+  - **Resulting URL:** `/{PUBLIC_PATH}/api/v1/...` — e.g. `https://imagent.identixweb.com/qa/{root folder name}/api/v1/...`
+  - **Common 404:** `POST /qa/{root folder name}/v1/...` (forgot `/api` in the endpoint) → `Cannot POST /qa/{root folder name}/v1/...`
+  - See `architecture.mdc` § 4.2.1 and `react-node-structure.md` → **Fix: API base path in React apps**.
+
+**Task done:** run `PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run preview` and verify `https://imagent.identixweb.com/qa/{root folder name}/api/health` — see `architecture.mdc` § 4.3.
+
+---
+
+## 6. Root `.env.example` (Required)
+
+Commit at monorepo root; keep in sync with `envSchema` and **README/docs** documented values.
+
+- **MUST** use **non-empty** values for every key required for local dev/preview (ports, paths, dev DB name, etc.).
+- **MUST** pull values from `README.md` / `docs/**` when they specify setup — do not leave placeholders empty if docs give concrete dev values.
+- **When docs give name only (no value):** **MAY** commit empty value — **MUST** add comment above: purpose + **set real value in production/CI** (§ 2b).
+- **MUST NOT** commit real production secrets; use documented placeholders for tokens in dev, or empty + prod comment for prod-only secrets.
+
+```bash
+NODE_ENV=development
+PORT=8080
+PUBLIC_PATH=/
+WEB_PORT=3001
+API_PORT=4000
+API_BASE_URL=http://localhost:4000
+
+# Production: webhook signing secret from provider dashboard. Set in prod/CI before deploy — not needed for local preview.
+WEBHOOK_SIGNING_SECRET=
+```
+
+Gitignore: `.env`, `.env.local`, `.env.*.local` — never commit secrets.
+
+---
+
+## 7. Anti-Patterns
+
+```js
+// ❌ BAD — direct dotenv in app
+require("dotenv").config();
+const port = process.env.PORT || 3000;
+
+// ❌ BAD — @repo/config outside config folder
+const { env } = require("@repo/config/env");
+app.listen(env.PORT);
+
+// ❌ BAD — env in routes/controllers
+const db = process.env.DATABASE_URL;
+
+// ❌ BAD — overwrites CI-injected env
+dotenv.config({ override: true });
+
+// ❌ BAD — browser DefinePlugin uses API_BASE_URL (absolute localhost URL)
+__API_BASE_URL__: JSON.stringify(process.env.API_BASE_URL || "/api")
+
+// ❌ BAD — subpath prod: endpoint missing /api (404 on preview/deploy)
+apiFetch("/v1/...")  // → /qa/{root folder name}/v1/... — proxy ignores
+
+// ✅ GOOD — only from app config folder
+const { env } = require("./config/env");
+app.listen(env.API_PORT);
+
+// ✅ GOOD — browser base = PUBLIC_PATH in prod; endpoint includes /api
+__API_BASE_URL__: JSON.stringify(isDev ? "/api" : publicPathOrApi)
+apiFetch("/api/v1/...")
+```
+
+---
+
+## Checklist
+
+- [ ] `packages/config` exports `loadEnv` + validated base `env`
+- [ ] Every `apps/*` has `src/config/` (`env.js` + `index.js`)
+- [ ] App code imports `env` only from `./config` or `./config/env`
+- [ ] `@repo/config` imported only inside `packages/config` and `apps/*/config/`
+- [ ] Resolution order: existing `process.env` → `.env` files → Joi defaults → `.env.example`
+- [ ] `dotenv` only when keys missing; `override: false`
+- [ ] Root `.env.example` (shared keys) + per-app `.env.example` (app-only keys) — **non-empty** values for required keys
+- [ ] README/docs env values copied into plan and `.env.example` when adding keys
+- [ ] New/additional env keys registered in project `env.js` + config — § 2c (no raw `process.env`)
+- [ ] No raw `process.env.*` outside `packages/config` and `apps/*/config/`
+- [ ] Task-complete preview: `PUBLIC_PATH='/qa/{root folder name}' NODE_ENV=production npm run preview` + public `https://imagent.identixweb.com/qa/{root folder name}/api/health`

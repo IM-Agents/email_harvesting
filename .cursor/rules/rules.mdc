@@ -1,0 +1,674 @@
+---
+description: Universal coding standards index — naming, errors, performance, security gates and pointers to every stack rule
+alwaysApply: true
+---
+
+# Cursor Coding Standards Rules
+
+You are an AI assistant helping with code generation. Follow these coding standards and best practices for all generated code.
+
+## 📚 Standard References
+
+All code must follow the standards defined in the `rules/` folder:
+
+- **JavaScript Standards**: `./rules/javascript-stack.mdc`
+- **TypeScript Standards**: `./rules/typescript-stack.mdc`
+- **React Standards**: `./rules/react-stack.mdc`
+- **Shopify App Standards**: `./rules/shopify-stack.mdc`
+- **Node.js Standards**: `./rules/nodejs-stack.mdc`
+- **Python Standards**: `./rules/python-stack.mdc`
+- **PHP Standards**: `./rules/php-stack.mdc`
+- **Flutter Standards**: `./rules/flutter-stack.mdc`
+- **MySQL Standards**: `./rules/mysql-stack.mdc`
+- **PostgreSQL Standards**: `./rules/postgresql-stack.mdc`
+- **MongoDB Standards**: `./rules/mongodb-stack.mdc`
+- **Database Common Standards**: `./rules/database-common-stack.mdc`
+- **Electron Standards**: `./rules/electron-stack.mdc`
+- **Architecture (monorepo / Turborepo)**: `./rules/architecture.mdc` — skill: `.cursor/skills/architecture/SKILL.md` (MySQL bootstrap: § 3.1 — `npm run db:init` when `DB_NAME` missing)
+- **Figma tree structure (checklist)**: `./rules/figma-tree-structure-checklist.mdc` — index: `{monorepo}/docs/figma-tree.md` (read only; do not auto-create)
+- **Figma tree page implementation**: `./rules/figma-tree-implementation.mdc` — skill: `.cursor/skills/figma-tree-todo/SKILL.md` (inventory → **animation audit (CSS)** → MCP components → validate → Figma assets → page)
+- **Front-end (React/Next/Tailwind persona)**: `./rules/front-end-cursor-rules.mdc`
+- **Code review**: `./rules/code-review-stack.mdc` — skill: `.cursor/skills/code-review/SKILL.md`
+- **Test case generation**: `./rules/testcase-generation-folder-structure.mdc`
+- **Pre-work requirements** (read README, Figma, clarify before coding): `./rules/pre-work-requirements.mdc`
+- **Planning** (README/docs → think → master plan + feature chunks): `./rules/planning.mdc`
+
+---
+
+## Root `.gitignore` — `automation/` (MANDATORY)
+
+Applies to **every** task (scaffold, feature work, test-case generation, Playwright setup). Do this at the **repository / monorepo root** before or when `automation/` exists.
+
+| Rule | Requirement |
+|------|-------------|
+| File exists | **MUST** have a root `.gitignore`. **Create** `.gitignore` at repo root if it is missing. |
+| `automation/` | **MUST** include `automation/` so the Playwright/QA automation tree is never committed. |
+| Must not | **MUST NOT** commit `automation/` or remove the `automation/` ignore entry to force-commit specs/logs. |
+
+**Required entry** (add if absent; do not duplicate):
+
+```gitignore
+# Playwright automation (generated locally for QA; do not commit)
+automation/
+```
+
+**Agent checklist**
+
+- [ ] Root `.gitignore` exists (created if missing)
+- [ ] Contains `automation/` (with trailing slash)
+- [ ] `automation/` is not tracked in git
+---
+
+## 🔧 Universal Standards (All Code)
+
+### Naming Conventions
+- **Variables**: camelCase (`const userName = "John"`)
+- **Constants**: UPPER_SNAKE_CASE (`const MAX_RETRIES = 3`)
+- **Functions**: camelCase with verb (`function fetchUser()`)
+- **Classes**: PascalCase (`class UserManager {}`)
+- **Files**: Match export type (camelCase for utils, PascalCase for classes)
+- **Database**: snake_case (`user_id`, `created_at`)
+
+### Code Quality
+- ✅ Use `const` by default, `let` when needed, never `var`
+- ✅ One responsibility per function/class/module
+- ✅ Functions under 50 lines, files under 400 lines
+- ✅ Self-documenting code with clear names
+- ✅ JSDoc comments for public APIs
+- ✅ No commented-out code
+
+### Error Handling (MANDATORY)
+- ✅ Always use try-catch for error-prone operations
+- ✅ Throw meaningful error messages
+- ✅ Log errors with context
+- ✅ Handle async/await errors properly
+- ✅ Never silently catch errors
+
+### Performance Rules
+- **API responses**: < 200ms (p95)
+- **Database queries**: < 100ms (p95)
+- **Page loads**: < 2.5s (LCP)
+- **Bundle size**: < 100KB (gzipped)
+- **Test coverage**: > 70%
+- **Memory**: Stable, no leaks
+- **CPU**: < 80% during normal operations
+
+### Security (MANDATORY)
+- ✅ Validate ALL user input
+- ✅ Use parameterized database queries (never string concatenation)
+- ✅ Never log passwords or sensitive data
+- ✅ Use HTTPS in production
+- ✅ Implement authentication/authorization
+- ✅ Use rate limiting for APIs
+- ✅ Sanitize output to prevent XSS
+- ✅ Implement CORS properly
+
+---
+
+## 🟨 JavaScript (ES6+) Standards
+
+### Key Rules (from javascript-stack.mdc)
+- ✅ Use async/await, not callbacks or promise chains
+- ✅ Implement proper error handling with try-catch
+- ✅ Use arrow functions for callbacks
+- ✅ Debounce/throttle event handlers
+- ✅ Memoize expensive computations
+- ✅ Clean up event listeners (prevent memory leaks)
+- ✅ Use named exports (tree-shakeable)
+- ✅ No global variable pollution
+- ✅ Avoid deeply nested code
+
+### Code Example Pattern
+```javascript
+// ✅ CORRECT
+const userEmail = "user@example.com";
+const MAX_RETRIES = 3;
+
+function calculateTotal(items) {
+  try {
+    return items.reduce((sum, item) => sum + item.price, 0);
+  } catch (error) {
+    console.error('Calculation failed:', error);
+    throw error;
+  }
+}
+
+async function fetchUser(id) {
+  try {
+    const response = await fetch(`/api/users/${id}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Fetch failed:', error);
+    throw error;
+  }
+}
+
+// ✗ NEVER DO THIS
+var oldStyle = 10;
+function badError() { return something.catch(); }
+fetch('/api').then(r => r.json());  // No error handling
+```
+
+---
+
+## 🔷 TypeScript Standards
+
+### Key Rules (from typescript-stack.mdc)
+- ✅ `"strict": true` in tsconfig; `tsc --noEmit` in CI
+- ✅ No `any`—use `unknown` at boundaries, then narrow
+- ✅ Explicit return types on public APIs
+- ✅ Validate external input with Zod/schema (no blind `as` casts)
+- ✅ `import type` for type-only imports
+- ✅ `catch (err: unknown)` and narrow before use
+- ✅ `noFloatingPromises` / async lint enabled
+- ✅ Props typed explicitly in `.tsx` components
+
+### Pattern
+```typescript
+// ✅ CORRECT
+const body: unknown = await res.json()
+const user = userSchema.parse(body)
+
+export async function fetchUser(id: string): Promise<User> {
+  const res = await fetch(`/api/users/${id}`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return userSchema.parse(await res.json())
+}
+
+function getMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return 'Unknown error'
+}
+
+// ✗ NEVER DO THIS
+const user = (await res.json()) as User
+catch (e: any) { /* ... */ }
+// @ts-ignore
+const x = process.env.API_KEY!
+```
+
+---
+
+## ⚛️ React Standards
+
+**Also apply:** [JavaScript Standards](#-javascript-es6-standards) (`javascript-stack.mdc`) for `.js`/`.jsx` · [TypeScript Standards](#-typescript-standards) (`typescript-stack.mdc`) for `.ts`/`.tsx`
+
+### Key Rules (from react-stack.mdc)
+- ✅ Pair with **javascript-stack** or **typescript-stack** on every UI file
+- ✅ Use functional components only (never class components)
+- ✅ Proper useEffect dependency arrays
+- ✅ Custom hooks for reusable logic
+- ✅ React.memo for expensive components
+- ✅ useMemo for expensive computations
+- ✅ useCallback for function props
+- ✅ Code splitting and lazy loading
+- ✅ Unique, stable keys in lists
+- ✅ **Formik + Yup** for validated forms (required fields, email/password, etc.) — not ad-hoc `useState` validators
+- ✅ Controlled components only for simple non-validated inputs (e.g. search)
+- ✅ Error boundaries for error handling
+
+### Component Structure
+```javascript
+// ✅ CORRECT
+export function UserProfile({ userId, onClose }) {
+  const [user, setUser] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    fetchUser(userId)
+      .then(data => isMounted && setUser(data))
+      .finally(() => isMounted && setLoading(false));
+    return () => { isMounted = false; };
+  }, [userId]);
+
+  if (loading) return <Spinner />;
+  return <div>{user?.name}</div>;
+}
+
+// ✗ NEVER DO THIS
+class UserProfile extends React.Component { }  // Old pattern
+const list = items.map(i => <Item />);  // No key!
+const obj = {};  // New object every render
+```
+
+---
+
+## 🔲 Node.js & Express Standards
+
+**Also apply:** [JavaScript Standards](#-javascript-es6-standards) (`javascript-stack.mdc`) for `.js` · [TypeScript Standards](#-typescript-standards) (`typescript-stack.mdc`) for `.ts`
+
+### Key Rules (from nodejs-stack.mdc)
+- ✅ Pair with **javascript-stack** or **typescript-stack** on every backend file
+- ✅ Middleware in correct order: security → parsing → auth → routes → errors
+- ✅ All async routes wrapped with asyncHandler
+- ✅ Error handling middleware for all errors
+- ✅ Input validation on all endpoints
+- ✅ Parameterized database queries
+- ✅ Structured JSON logging
+- ✅ Rate limiting enabled
+- ✅ Helmet.js security headers
+- ✅ CORS properly configured
+- ✅ Graceful shutdown implemented
+
+### Express Server Pattern
+```javascript
+// ✅ CORRECT MIDDLEWARE ORDER
+app.use(helmet());
+app.use(express.json());
+app.use(cors());
+app.use(loggingMiddleware);
+app.use(authenticate);
+app.use('/api', routes);
+app.use(errorHandler);  // LAST!
+
+// ✅ Async handler wrapper
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// ✅ Use with routes
+app.get('/users/:id', asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  res.json(user);
+}));
+```
+
+---
+
+## 🗄️ MySQL Standards
+
+### Default `DB_*` environment (`{monorepo}`)
+
+From `database-common-stack.mdc`, `mysql-stack.mdc`, `env-variables.mdc`:
+
+- Platform may inject `DB_NAME={platform_db_name}` (`im_agent_local`); each `{monorepo}` **MUST** override **`DB_NAME={db_name}`** in root `.env` only via `loadEnv()`.
+- **Env values:** pick up from `README.md` / `docs/**`; empty in `.env.example` only with purpose + prod comment — `env-variables.mdc` § 2b.
+- **New env keys:** extend **project env stack** (`loadEnv`, `env.js`, `.env.example`) — § 2c; do not bypass with raw `process.env`.
+- Docker: `DB_HOST=db` from container — **MUST NOT** override with `localhost` from `.env` in IM platform container.
+- Missing schema: **`npm run db:init`**; corrupt migrations: reset `{db_name}` schema (not only `db:init`).
+- **Preview:** `db:migrate` before spawn (§ `architecture.mdc` 3.2).
+- **Task done:** when implementation is finished, **MUST** run preview and fix until health checks pass — including DB/env if MySQL (`architecture.mdc` § 4.3, `pre-work-requirements.mdc` § 6).
+- **MySQL + schema + APIs:** after health OK, **MUST** confirm all tables exist (`db:status`, `SHOW TABLES`), then test every DB-backed route; fix missing tables/migrations or API errors before done (`database-common-stack.mdc`).
+
+**Examples:** `{root folder name}` `login` → `{db_name}` `login_app` — see `{monorepo}/README.md` per product.
+
+### Key Rules (from mysql-stack.mdc)
+- ✅ BIGINT for primary keys (not INT)
+- ✅ DECIMAL for money (not FLOAT)
+- ✅ Index foreign keys
+- ✅ Index frequently searched columns
+- ✅ Parameterized queries (prevent SQL injection)
+- ✅ Never `SELECT *`—list only needed columns in every query
+- ✅ Pagination on large results
+- ✅ Use transactions for related operations
+- ✅ Backup strategy defined
+- ✅ Connection pooling enabled
+
+### Schema Pattern
+```sql
+-- ✅ CORRECT
+CREATE TABLE users (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  email VARCHAR(100) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_email CHECK (email LIKE '%@%.%')
+);
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_created ON users(created_at);
+
+-- ✗ NEVER DO THIS
+SELECT * FROM users;
+SELECT id, email FROM users;  -- missing LIMIT on large tables when listing
+UPDATE users SET active = 1;  -- No WHERE clause!
+```
+
+---
+
+## 🗄️ PostgreSQL Standards
+
+### Key Rules (from postgresql-stack.mdc)
+- ✅ Never `SELECT *`—list only needed columns in every query
+- ✅ JSONB for semi-structured data
+- ✅ ENUM types for fixed value sets
+- ✅ Window functions for analytics
+- ✅ Full-text search for text columns
+- ✅ CTEs for complex queries
+- ✅ Materialized views for expensive queries
+- ✅ GIN indexes for JSONB/arrays
+- ✅ EXPLAIN ANALYZE for query optimization
+- ✅ Regular VACUUM ANALYZE maintenance
+- ✅ Parameterized queries (prevent SQL injection)
+
+### Advanced Pattern
+```sql
+-- ✅ CORRECT - JSONB with index
+CREATE TABLE users (
+  id BIGSERIAL PRIMARY KEY,
+  profile_data JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_profile ON users USING GIN(profile_data);
+
+-- ✅ Window function
+SELECT id, amount,
+  SUM(amount) OVER (ORDER BY date) as running_total
+FROM orders;
+
+-- ✗ NEVER DO THIS
+profile_data TEXT;  -- Use JSONB instead
+status VARCHAR(20);  -- Use ENUM instead
+```
+
+---
+
+## 🍃 MongoDB Standards
+
+### Key Rules (from mongodb-stack.mdc)
+- ✅ Embed vs reference decided per collection (bounded vs shared/unbounded)
+- ✅ `createdAt` / `updatedAt` on mutable docs; consistent soft delete
+- ✅ `Decimal128` or integer cents for money (not float)
+- ✅ Compound indexes: equality → sort → range; `explain` on hot paths
+- ✅ Projections on reads; keyset pagination (no deep `skip`)
+- ✅ One `MongoClient` per process; repositories only (not routes)
+- ✅ Least-privilege user + TLS in production
+- ✅ Parameterized filters—never user-controlled query keys
+- ✅ Versioned migrations in `db/migrations/mongodb/`
+
+### Pattern
+```javascript
+// ✅ CORRECT — index, projection, repository access
+db.orders.createIndex({ userId: 1, createdAt: -1 })
+
+export async function listOrders(userId, cursor, limit = 20) {
+  const filter = { userId: new ObjectId(userId), deletedAt: null }
+  if (cursor) filter.createdAt = { $lt: cursor }
+  return orders.find(filter, {
+    projection: { status: 1, totalCents: 1, createdAt: 1 },
+  }).sort({ createdAt: -1 }).limit(limit).toArray()
+}
+
+// ✗ NEVER DO THIS
+orders.find({ userId }).skip(page * 500).limit(20)  // deep skip
+orders.find({ [field]: value })                       // injection-style keys
+new MongoClient(uri) per request                      // pool exhaustion
+{ price: 19.99 }                                      // float money
+```
+
+---
+
+## 🐍 Python Standards
+
+### Key Rules (from python-stack.mdc)
+- ✅ Python 3.11+; `src/` layout; route → service → repository
+- ✅ Type hints on public APIs; mypy/pyright in CI
+- ✅ Pydantic v2 (or serializers) at HTTP boundary
+- ✅ Parameterized SQL only; never `SELECT *`
+- ✅ No bare `except:`; log with context (`request_id`)
+- ✅ Secrets in env only; Ruff + pytest + audit in CI
+- ✅ Async routes only with async I/O or `asyncio.to_thread` offload
+
+### Pattern
+```python
+# ✅ CORRECT — typed, Pydantic, explicit columns
+from pydantic import BaseModel
+
+class CreateOrderInput(BaseModel):
+    user_id: str
+    sku: str
+    qty: int
+
+async def create_order(
+    body: CreateOrderInput,
+    service: OrderService = Depends(get_order_service),
+) -> OrderResponse:
+    return await service.create(body)
+
+stmt = select(Order.id, Order.status).where(Order.id == order_id)
+
+# ✗ NEVER DO THIS
+def get_order(order_id): ...
+session.execute(text(f"SELECT * FROM orders WHERE id = '{order_id}'"))
+except: pass
+def handler(items=[]): ...
+```
+
+---
+
+## 🐘 PHP Standards
+
+### Key Rules (from php-stack.mdc)
+- ✅ PHP 8.2+ with `declare(strict_types=1)` on new files
+- ✅ PSR-4 + Composer; `composer.lock` committed
+- ✅ Only `public/` web-accessible; `.env` never in repo
+- ✅ Controller → service → repository layering
+- ✅ Typed parameters, returns, and properties; enums for fixed sets
+- ✅ PDO/ORM prepared statements only (no SQL concat)
+- ✅ Never `SELECT *`—list only needed columns (`SELECT id, email, ...`)
+- ✅ `password_hash` / `password_verify` for passwords
+- ✅ Form Request / Validator at boundary; central exception mapping
+- ✅ `composer audit` in CI; `APP_DEBUG=false` in production
+
+### Pattern
+```php
+<?php
+
+declare(strict_types=1);
+
+// ✅ CORRECT — strict types, bound query, typed service
+$stmt = $pdo->prepare('SELECT id, email FROM users WHERE email = :email');
+$stmt->execute(['email' => $email]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// ✗ NEVER DO THIS
+$pdo->query("SELECT * FROM users WHERE email = '$email'");
+User::create(request()->all());           // mass assignment risk
+echo $_GET['name'];                        // XSS
+@file_get_contents($userPath);             // suppressed errors
+eval($userCode);                           // code injection
+```
+
+---
+
+## 📱 Flutter Standards
+
+### Key Rules (from flutter-stack.mdc)
+- ✅ Sound null safety; avoid unnecessary `!`
+- ✅ Feature-first `lib/` layout; thin `main.dart`
+- ✅ `const` widgets where values are stable
+- ✅ `ListView.builder` / slivers for long lists
+- ✅ One state-management pattern per app (Riverpod, Bloc, or team standard)
+- ✅ Loading, empty, and error UI for async screens
+- ✅ Tokens in secure storage; HTTPS; no client secrets
+- ✅ Widget + unit tests; integration tests for critical flows
+- ✅ Honor `analysis_options.yaml` / `flutter_lints`
+
+### Pattern
+```dart
+// ✅ CORRECT — const widget, typed model, bounded list
+class UserList extends StatelessWidget {
+  const UserList({super.key, required this.users});
+  final List<User> users;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: users.length,
+      itemBuilder: (context, index) => UserTile(user: users[index]),
+    );
+  }
+}
+
+// ✗ NEVER DO THIS
+Column(children: users.map((u) => UserTile(user: u)).toList()); // unbounded
+final token = prefs.getString('token'); // insecure storage
+```
+
+---
+
+## 🖥️ Electron Standards
+
+### Key Rules (from electron-stack.mdc)
+- ✅ Preload script for security (contextIsolation: true)
+- ✅ IPC for main/renderer communication
+- ✅ Content Security Policy headers
+- ✅ No nodeIntegration in renderer
+- ✅ Input validation on IPC handlers
+- ✅ File path validation (prevent traversal)
+- ✅ Logging for debugging
+- ✅ Auto-update mechanism
+- ✅ Graceful shutdown
+- ✅ Error handling for all IPC calls
+
+### Security Pattern
+```javascript
+// ✅ CORRECT - Main process
+new BrowserWindow({
+  webPreferences: {
+    preload: path.join(__dirname, 'preload.js'),
+    contextIsolation: true,      // ✅ Enable
+    enableRemoteModule: false,   // ✅ Disable
+    sandbox: true,               // ✅ Enable
+    nodeIntegration: false       // ✅ Disable
+  }
+});
+
+// ✅ IPC with validation
+ipcMain.handle('save-file', async (event, fileName, content) => {
+  if (!fileName || typeof content !== 'string') {
+    throw new Error('Invalid input');
+  }
+  const safePath = path.join(app.getPath('documents'), fileName);
+  if (!safePath.startsWith(app.getPath('documents'))) {
+    throw new Error('Invalid path');
+  }
+  await fs.promises.writeFile(safePath, content);
+  return { success: true };
+});
+
+// ✗ NEVER DO THIS
+nodeIntegration: true;  // DANGEROUS!
+contextIsolation: false;  // UNSAFE!
+ipcMain.handle('save', (event, path, content) => {  // No validation!
+  fs.writeFileSync(path, content);  // Path traversal risk!
+});
+```
+
+---
+
+## 🔗 Database Common Standards
+
+### Key Rules (from database-common-stack.mdc)
+- ✅ Universal naming: snake_case for tables/columns
+- ✅ Constraints: PK, FK, UNIQUE, CHECK
+- ✅ Transactions for related operations
+- ✅ Backup/restore strategy
+- ✅ Performance targets defined
+- ✅ Security: parameterized queries
+- ✅ Never `SELECT *`—explicit column lists in all relational queries
+- ✅ MySQL, PostgreSQL, and MongoDB selection guidance
+- ✅ Relational vs document store tradeoffs documented in skills
+
+### Pattern
+```sql
+-- ✅ CORRECT - Both MySQL & PostgreSQL
+CREATE TABLE orders (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  amount DECIMAL(10, 2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  CONSTRAINT fk_orders_user_id 
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX idx_orders_user_id ON orders(user_id);
+
+-- ✅ Parameterized + explicit columns
+SELECT id, user_id, amount, created_at
+FROM orders
+WHERE user_id = ?;
+
+-- ✗ NEVER DO THIS
+SELECT * FROM orders WHERE user_id = ?;
+SELECT id, amount FROM orders WHERE user_id = '${userId}';  -- SQL injection!
+```
+
+---
+
+## 📊 Performance Requirements
+
+### Frontend Performance
+- **Bundle size**: < 100KB (gzipped)
+- **LCP** (Largest Contentful Paint): < 2.5s
+- **FID** (First Input Delay): < 100ms
+- **CLS** (Cumulative Layout Shift): < 0.1
+
+### Backend Performance
+- **API response**: < 200ms (p95)
+- **Database query**: < 100ms (p95)
+- **Error rate**: < 0.1%
+- **Uptime**: > 99.9%
+
+### Desktop Performance (Electron)
+- **Startup**: < 2 seconds
+- **Memory**: < 200MB baseline
+- **CPU (idle)**: < 5%
+
+---
+
+## ✅ Testing Requirements
+
+- **Minimum coverage**: 70%
+- **Unit tests**: For business logic
+- **Integration tests**: For workflows
+- **Test both**: Success and error paths
+- **Mock**: External dependencies
+
+---
+
+## 🔒 Security Checklist
+
+- [ ] Input validation on all boundaries
+- [ ] Parameterized database queries
+- [ ] No sensitive data in logs
+- [ ] HTTPS in production
+- [ ] Authentication/authorization
+- [ ] Rate limiting enabled
+- [ ] Security headers present
+- [ ] CORS properly configured
+- [ ] Error messages don't leak info
+- [ ] Dependencies kept up-to-date
+
+---
+
+## 📝 When in Doubt
+
+1. Check the specific standard file (javascript-stack.mdc, typescript-stack.mdc, python-stack.mdc, react-stack.mdc, shopify-stack.mdc, etc.)
+2. Look for code examples (✓ correct, ✗ wrong)
+3. Follow the pattern shown
+4. Implement error handling
+5. Test thoroughly
+6. Consider performance
+7. Review security
+
+---
+
+## 🎯 Summary
+
+**Follow these in order of priority:**
+
+1. **Security** - Always validate input, use parameterized queries
+2. **Error Handling** - Try-catch everything, log errors
+3. **Performance** - Meet targets, optimize queries
+4. **Code Quality** - Clean code, proper naming, testing
+5. **Best Practices** - Follow patterns, avoid anti-patterns
+
+---
+
+**Generated code must comply with all standards in ./rules/ files.**
+
+Last updated: 2026-05-23

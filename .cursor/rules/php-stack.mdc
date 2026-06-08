@@ -1,0 +1,81 @@
+---
+description: Modern PHP 8+ structure, typing, security, PDO, and Laravel/Symfony best practices
+globs: **/*.php, **/app/**/*.php, **/src/**/*.php, **/routes/**/*.php, **/tests/**/*.php, composer.json
+alwaysApply: false
+---
+
+# PHP Best Practices
+
+Full standards: `.cursor/skills/php/SKILL.md` · Reference: `.cursor/skills/php/reference/`
+
+## Project structure
+
+- **MUST** use PSR-4 autoload via Composer; commit `composer.lock`.
+- **MUST** expose only `public/` to the web server—never `src/`, `vendor/`, or `.env`.
+- **MUST** use `declare(strict_types=1);` in new PHP files.
+- **MUST** layer: controller → service → repository; no raw SQL in controllers.
+- **SHOULD** target PHP 8.2+ with typed properties, enums, and constructor promotion.
+
+## Types and code quality
+
+- **MUST** type parameters, return types, and public properties.
+- **MUST** use constructor injection; avoid globals and service locators.
+- **SHOULD** use `enum` for fixed value sets; `match` for exhaustive branches.
+- **MUST NOT** use `@` to suppress errors or empty `catch` blocks.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Order;
+
+enum OrderStatus: string
+{
+    case Pending = 'pending';
+    case Paid = 'paid';
+}
+```
+
+## Database and security
+
+- **MUST** use PDO/ORM with **bound parameters only**—never concatenate user input into SQL.
+- **MUST** list only needed columns in `SELECT`—never use `SELECT *`.
+- **MUST** hash passwords with `password_hash()` / `password_verify()`.
+- **MUST** validate input at HTTP boundary (Form Request / Validator DTO).
+- **MUST** escape HTML output or use auto-escaping templates.
+- **SHOULD** run `composer audit` in CI; secrets only in `.env`, not in repo.
+
+```php
+// ✅ GOOD — explicit columns + bound parameter
+$stmt = $pdo->prepare('SELECT id, email, created_at FROM users WHERE email = :email');
+$stmt->execute(['email' => $email]);
+
+// ✗ BAD
+$pdo->query("SELECT * FROM users WHERE email = '$email'");
+$stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email');
+```
+
+## HTTP APIs
+
+- **MUST** return consistent JSON errors: `{ "error": { "code", "message" } }`.
+- **MUST** map domain exceptions in one exception handler/listener.
+- **SHOULD** use keyset pagination on large tables; avoid unbounded queries.
+
+## Frameworks (Laravel / Symfony)
+
+- **MUST** keep controllers thin; validation in Form Requests or Symfony Validator.
+- **MUST NOT** pass `request()->all()` to mass assignment without `$fillable` / DTO allowlist.
+- **SHOULD** queue slow IO (email, webhooks); cache config/routes in production deploy.
+
+## Testing and deploy
+
+- **SHOULD** cover services with PHPUnit/Pest; mock repositories in unit tests.
+- **MUST** set `display_errors=Off` and `APP_DEBUG=false` in production.
+
+## Anti-patterns
+
+- `eval`, `exec`, `unserialize` on user input; `extract()` on request data.
+- Business logic in Blade/views without tests.
+- `env()` outside config files in production (Laravel).
+- Leaking stack traces in production API responses.

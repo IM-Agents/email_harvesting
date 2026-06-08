@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "package.json", "webpack.config.js", "babel.config.js", "knexfile.js"],
+      "outputs": ["dist/**"],
+      "env": [
+        "NODE_ENV",
+        "PUBLIC_PATH",
+        "API_BASE_URL",
+        "PORT",
+        "API_PORT",
+        "WEB_PORT"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "tests/**"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

@@ -1,0 +1,75 @@
+---
+description: Flutter and Dart best practices for mobile, web, and desktop UI
+globs: **/*.dart, **/lib/**/*
+alwaysApply: false
+---
+
+# Flutter Best Practices
+
+**Flutter skill:** `.cursor/skills/flutter/SKILL.md`  
+**Universal gates:** `rules.mdc`
+
+- **MUST** follow Dart null-safety and team `analysis_options.yaml` / linter rules.
+- **MUST** handle loading, empty, and error UI for async screens.
+- **SHOULD** use one primary state-management pattern per app (Riverpod, Bloc, or team standard).
+
+## Project Structure
+- Use feature-first folders under `lib/features/`
+- Keep `main.dart` minimal; bootstrap in `lib/app/`
+- Colocate tests with features (`test/features/...`)
+- Pin dependencies in `pubspec.yaml` with intentional upgrades
+- Isolate platform code in `android/`, `ios/`, `web/`
+
+## Widgets
+- Prefer StatelessWidget; lift state only when needed
+- One primary widget per file for non-trivial UI
+- Use composition; avoid deep widget inheritance
+- Use `const` constructors for stable subtrees
+- Extract widgets when `build` grows or repeats
+
+## State Management
+- Local UI state stays near the widget
+- App state via Riverpod, Bloc, or agreed library—no ad hoc globals
+- Narrow rebuilds (`buildWhen`, selectors, `Consumer` scope)
+- Pass IDs through routes; load models in destination
+
+## Navigation
+- Use declarative routing (`go_router` or team standard)
+- Centralize auth guards and deep links
+- Avoid passing large objects in route extras
+
+## Async and Errors
+- Use async/await; cancel streams and timers in `dispose`
+- Check `mounted` before `setState` after awaits in StatefulWidget
+- Map errors to user-safe copy; log with context, no secrets/PII
+- Typed failures at repository boundaries
+
+## Performance
+- ListView.builder / slivers for long lists
+- No heavy sync work on the UI isolate
+- Cache network images with explicit dimensions
+- Profile with DevTools before blanket RepaintBoundary/memo patterns
+
+## Theming and Accessibility
+- Use ThemeData and ColorScheme; avoid scattered magic colors
+- Support text scaling and contrast
+- Semantics labels on icon-only controls
+- Minimum ~48dp touch targets
+
+## Security
+- HTTPS in production; secrets only on backend
+- Tokens in secure storage, not SharedPreferences
+- Parse JSON into typed models before UI use
+- Validate platform channel payloads in native code
+
+## Testing
+- Unit tests for domain and repositories
+- Widget tests for UI states and interactions
+- Integration tests for critical user journeys when CI allows
+- Mock HTTP and platform boundaries, not business rules in widgets
+
+## Code Organization
+- `snake_case.dart` files; `PascalCase` types; `lowerCamelCase` members
+- Private API prefixed with `_`
+- Document non-obvious business rules briefly
+- No business logic inside `build()`

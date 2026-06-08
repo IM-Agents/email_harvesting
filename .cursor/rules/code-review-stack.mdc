@@ -1,0 +1,238 @@
+---
+description: Code review standards — severity, universal gates, stack MUST compliance from skills + rules, required comment format. Apply when reviewing PRs, diffs, or when the user requests a code review.
+globs: **/*.js,**/*.jsx,**/*.mjs,**/*.py,**/*.ts,**/*.tsx,**/*.html,**/*.json,**/*.css,**/*.scss,**/*.php,**/*.dart,**/*.sql,**/*.sh,**/*.xml,**/.env,**/.env.*
+alwaysApply: false
+---
+
+# Code review standards
+
+**Skill:** `.cursor/skills/code-review/SKILL.md`  
+**Checklists:** `.cursor/skills/code-review/reference/README.md`  
+**Stack map:** `.cursor/skills/code-review/reference/stack-map.md`  
+**Examples:** `.cursor/skills/code-review/reference/examples.md`  
+**Universal targets:** `.cursor/rules/rules.mdc` · **Stack rules:** matching `*-stack.mdc` per file type
+
+---
+
+## Core principle
+
+Aim for **zero false positives**. Every finding must be a true issue with a concrete fix. Flag only what a reasonable senior engineer would actually block on or comment about. A noisy review erodes trust faster than a missed nit.
+
+---
+
+## Severity (MUST use exactly these)
+
+| Level | Use when | Merge |
+|-------|----------|-------|
+| **Blocker** | Production bug, data loss, security exploit, broken public contract, missing server authZ, SQL injection, real secret in repo | Must fix |
+| **Major** | Violates stack **MUST**; provable bug on reachable path; untested auth/payment/delete path; N+1 on hot path; new `any` or empty catch; **`SELECT *`** in new query; new function >50 lines or new file >400 lines | Fix before merge |
+| **Minor** | Violates **SHOULD**; missing JSDoc on new public export; weak naming on new identifier | Fix or ticket |
+| **Nit** | Style/formatting — **only** when CI linter does NOT already enforce it | Optional |
+
+**MUST NOT** label style-only issues as Blocker or Major.  
+**MUST NOT** flag issues in files the PR did not change.  
+**MUST NOT** flag things the CI linter/formatter already catches.
+
+---
+
+## Four finding categories (Sonar model — classify before posting)
+
+| Category | Definition |
+|----------|------------|
+| **Bug** | Demonstrably wrong or more likely wrong than not on a reachable path |
+| **Vulnerability** | Exploitable by an attacker — injection, broken authZ, exposed secret, weak crypto |
+| **Security Hotspot** | Security-sensitive but not confirmed vulnerable — flag for human review, not auto-Blocker |
+| **Code Smell** | Maintainability issue — not wrong today but likely to cause future bugs |
+
+Every finding must fit one category before it is posted. If it fits none, it is not a finding.
+
+---
+
+## In-scope file types
+
+`.js`, `.jsx`, `.mjs`, `.py`, `.ts`, `.tsx`, `.html`, `.json`, `.css`, `.scss`, `.php`, `.dart`, `.sql`, `.sh`, `.env` (and `.env.*`), `.xml`
+
+**MUST NOT** block on files outside this list unless the user explicitly expands scope.  
+**MUST** review only **changed lines and their immediate context** — not pre-existing code the PR did not touch.
+
+---
+
+## Review process (MUST follow in order)
+
+1. Read PR description and stated intent before touching any file.
+2. Identify changed files — in-scope extensions only.
+3. Load leaf `.cursor/skills/<stack>/SKILL.md` + `.cursor/rules/<stack>-stack.mdc` for each distinct stack in the diff (see stack-map.md). Do not load stacks for file types not in the diff.
+4. Apply universal gates (below) to all changed in-scope files.
+5. Apply stack-specific rules only to files of that type.
+6. Classify each finding (Bug / Vulnerability / Hotspot / Code Smell) before writing the comment.
+7. Output the required review structure (Summary → Findings → Verified → Follow-ups).
+
+---
+
+## Universal gates (apply on every changed in-scope file)
+
+Source: `rules.mdc`. Flag only on **new or changed** code.
+
+- **MUST** reject new `var` — require `const`/`let`.
+- **MUST** reject empty `catch` blocks and unhandled floating promises.
+- **MUST** reject string-concatenated SQL — require parameterized queries.
+- **MUST** reject `SELECT *` in new production queries — explicit column lists only.
+- **MUST** reject real secrets, tokens, or passwords in any committed file.
+- **MUST** verify server-side authZ on any handler that creates, updates, deletes, or accesses restricted data — **Blocker** if missing.
+- **MUST** flag new auth/payment/delete paths with zero tests.
+- **SHOULD** flag new functions >50 lines or new files >400 lines without a documented split plan.
+- **SHOULD** flag obvious N+1 queries, full-table scans, or unbounded loops introduced by the PR.
+
+**Do NOT** flag performance against p95/LCP/bundle targets — those are CI/monitoring metrics, not per-PR review gates.
+
+---
+
+## TypeScript / JavaScript (flag on new/changed code only)
+
+- **MUST NOT** use `any` or blind `as T` — use `unknown` at boundary, then narrow with schema or guard.
+- **MUST** handle `async` errors with try/catch or equivalent.
+- **MUST** use `catch (err: unknown)` in TypeScript — not `catch (e: any)`.
+
+```typescript
+// ✗ Major — typescript-stack
+catch (e: any) { console.log(e) }
+const data = (await res.json()) as Order
+
+// ✅ Correct
+catch (err: unknown) {
+  const msg = err instanceof Error ? err.message : 'Unknown error'
+  throw new Error(`Order fetch failed: ${msg}`)
+}
+const data = orderSchema.parse(await res.json())
+```
+
+---
+
+## React (`.jsx` / `.tsx`)
+
+- **MUST** apply `javascript-stack.mdc` on `.jsx`; apply `typescript-stack.mdc` on `.tsx`.
+- **MUST** include cleanup return in `useEffect` when subscribing or adding listeners.
+- **MUST NOT** use array index as `key` when list order can change.
+- **MUST NOT** call Hooks conditionally or inside loops.
+
+**Do NOT flag:** missing `React.memo`/`useCallback`/`useMemo` without profiler evidence of a real performance problem.
+
+---
+
+## Node / API
+
+- **MUST** validate HTTP body/query/params at the boundary before domain logic.
+- **MUST** enforce server-side authZ in handler or middleware — not UI-only.
+- **MUST** return correct HTTP status codes (4xx client, 5xx server).
+- **MUST NOT** expose stack traces or internal error detail to clients in production.
+
+---
+
+## Security hotspots (flag for review — not auto-Blocker)
+
+These are sensitive but not confirmed vulnerabilities. Flag as **Security Hotspot** and ask for human review:
+
+- New cryptographic primitive usage (check algorithm, key length, IV reuse)
+- New `eval()`, `exec()`, `child_process.exec()` call
+- New CORS rule or `Access-Control-Allow-Origin: *`
+- New file upload endpoint (path traversal risk)
+- New rate-limit bypass or auth-skip configuration flag
+
+---
+
+## What NOT to comment on (MUST NOT block)
+
+| Do not flag | Reason |
+|-------------|--------|
+| Formatting, spacing, import order | CI linter handles this |
+| Files the PR did not change | Out of scope |
+| Pre-existing code untouched by the PR | Separate refactor ticket |
+| Performance without a measured regression | Speculation |
+| Architecture/style preferences without a team rule | Opinion |
+| "Consider using X instead of Y" alternatives | Goes in Follow-ups, not Findings |
+| Test coverage percentage | CI metric |
+| Missing features the PR doesn't claim to add | Separate ticket |
+
+---
+
+## Required comment shape (MUST include all five fields)
+
+```text
+[Severity] — <short title>
+File: path/to/file.ext:line
+Rule: <rules.mdc §X | *-stack.mdc MUST>
+Issue: <one sentence — what the code does wrong>
+Fix: <concrete change or exact steps>
+```
+
+```text
+✗ BAD — "Consider refactoring this function."
+✅ GOOD — Major — Missing authZ on DELETE /orders/:id (routes/orders.ts:88)
+           Rule: nodejs-stack.mdc — MUST enforce server-side authZ
+           Issue: Any authenticated user can delete any order; no ownership or role check.
+           Fix: Add `if (order.userId !== req.user.id) throw new ForbiddenError()` before Order.delete().
+```
+
+---
+
+## Required review output structure
+
+```markdown
+## Summary
+<Approve | Request changes | Comment only> — <one sentence why>
+
+## Findings
+### [Severity] — <title>
+- **File:** `path:line`
+- **Rule:** `rules.mdc §X` / `*-stack.mdc`
+- **Issue:** …
+- **Fix:** …
+
+## Verified ✓
+- <at least one thing the PR does correctly — required>
+
+## Follow-ups (non-blocking)
+- <suggestions, alternatives, tickets>
+```
+
+The **Verified** section is required. A review with zero positive observations is almost always incomplete.
+
+---
+
+## Stack index
+
+Full map: `.cursor/skills/code-review/reference/stack-map.md`
+
+| Files | Skill | Rule |
+|-------|-------|------|
+| `.js`, `.jsx`, `.mjs` | `javascript-advanced/SKILL.md` | `javascript-stack.mdc` |
+| `.ts`, `.tsx` | `typescript/SKILL.md` | `typescript-stack.mdc` |
+| `.jsx`, `.tsx` (UI) | also `react/SKILL.md` | also `react-stack.mdc` |
+| `.js`, `.mjs` (APIs) | also `nodejs/SKILL.md` | also `nodejs-stack.mdc` |
+| `.py` | `python/SKILL.md` | `python-stack.mdc` |
+| `.php` | `php/SKILL.md` | `php-stack.mdc` |
+| `.dart` | `flutter/SKILL.md` | `flutter-stack.mdc` |
+| `.sql` | `database-common/SKILL.md` + dialect | matching `*-stack.mdc` |
+| `.html`, `.css`, `.scss` | — | `rules.mdc`; `front-end-cursor-rules.mdc` |
+| `.json` | — | `rules.mdc`; `typescript-stack.mdc` for `tsconfig*.json` |
+| `.sh` | — | `rules.mdc` (security, quoting, fail-fast) |
+| `.env`, `.env.*` | — | `rules.mdc` §Security — **Blocker** on committed secrets |
+| `.xml` | — | `rules.mdc` §Security (manifests, permissions) |
+
+Extended stacks (Shopify, Electron, `.cjs`, MongoDB) are out of scope unless the user expands.
+
+## Auto-fix loop (MUST follow after every review)
+
+IF any Blocker or Major found:
+  - Apply the Fix directly to the file at the stated line
+  - Do NOT ask for confirmation — fix immediately
+  - Re-run full review from Step 0
+  - Repeat until zero Blockers and zero Majors remain
+  - Max 3 loops — if still unresolved after 3 passes output:
+    ⚠ Manual review needed — could not auto-fix: [list remaining issues]
+  - On clean pass output:
+    ✅ All clear — Approved — ready to push
+
+IF only Minor / Nit / zero findings:
+  - Output: ✅ Approved — ready to push
+  - List Minor/Nit under Follow-ups only, never block push

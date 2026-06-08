@@ -1,0 +1,127 @@
+{
+  "mcpServers": {
+    "figma": {
+      "url": "https://mcp.figma.com/mcp"
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "desktop-commander": {
+      "command": "npx",
+      "args": ["-y", "@wonderwhy-er/desktop-commander@latest"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "code-review-graph": {
+      "command": "code-review-graph",
+      "args": ["serve"],
+      "type": "stdio"
+    },
+    "graphify": {
+      "command": "npx",
+      "args": ["-y", "graphify-mcp-tools@latest"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspaceFolder}"
+      ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}"
+      }
+    },
+    "gitlab": {
+      "type": "http",
+      "url": "https://gitlab.com/api/v4/mcp"
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "${env:POSTGRES_CONNECTION_STRING}"
+      }
+    },
+    "mysql": {
+      "command": "npx",
+      "args": ["-y", "@f4ww4z/mcp-mysql-server"],
+      "env": {
+        "MYSQL_HOST": "${env:MYSQL_HOST}",
+        "MYSQL_USER": "${env:MYSQL_USER}",
+        "MYSQL_PASSWORD": "${env:MYSQL_PASSWORD}",
+        "MYSQL_DATABASE": "${env:MYSQL_DATABASE}"
+      }
+    },
+    "mongodb": {
+      "command": "npx",
+      "args": ["-y", "mongodb-mcp-server@latest", "--readOnly"],
+      "env": {
+        "MDB_MCP_CONNECTION_STRING": "${env:MDB_MCP_CONNECTION_STRING}"
+      }
+    },
+    "docker": {
+      "command": "npx",
+      "args": ["-y", "@hypnosis/docker-mcp-server"]
+    },
+    "sentry": {
+      "url": "https://mcp.sentry.dev/mcp"
+    },
+    "cloudflare": {
+      "url": "https://mcp.cloudflare.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:CLOUDFLARE_API_TOKEN}"
+      }
+    },
+    "posthog": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://mcp.posthog.com/mcp",
+        "--header",
+        "Authorization:Bearer ${env:POSTHOG_API_KEY}"
+      ]
+    },
+    "shopify-dev": {
+      "command": "npx",
+      "args": ["-y", "@shopify/dev-mcp@latest"],
+      "env": {
+        "OPT_OUT_INSTRUMENTATION": "true"
+      }
+    },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "NOTION_TOKEN": "${env:NOTION_TOKEN}"
+      }
+    },
+    "aws": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.aws-api-mcp-server@latest",
+        "awslabs.aws-api-mcp-server.exe"
+      ],
+      "env": {
+        "AWS_REGION": "${env:AWS_REGION}"
+      }
+    },
+    "notebooklm": {
+      "command": "npx",
+      "args": ["-y", "notebooklm-mcp-server", "start"]
+    }
+  }
+}

@@ -1,0 +1,69 @@
+---
+description: Turbo build cache vs shell env (PUBLIC_PATH, API_BASE_URL) — CLI first, env in turbo.json
+globs: turbo.json,**/webpack.config.*,packages/config/**/loadEnv.js,scripts/preview*.js,scripts/proxy.js
+alwaysApply: false
+---
+
+# Turbo Cache & Shell Environment
+
+When `preview` runs `turbo run build`, Turbo may **replay a cached build** and skip webpack. A stale cache ignores a new shell `PUBLIC_PATH`.
+
+## CLI / shell has highest priority
+
+1. Values set on the command line (`PUBLIC_PATH='/qa/{root folder name}' npm run preview`) **MUST** win over `.env` and `.env.example`.
+2. `loadEnv()` **MUST** use `dotenv.config({ override: false })` and **MUST** restore shell values after loading files (see `env-variables.mdc` §2).
+
+## `PUBLIC_PATH` format
+
+| Value | Use |
+|-------|-----|
+| `/` | Root deploy |
+| `/qa/{root folder name}` or `/qa/{root folder name}/` | Subpath behind reverse proxy (`{root folder name}` = repo basename) |
+| `http://…` | **Avoid** for preview/proxy; webpack `publicPath` + `proxy.js` expect a **path prefix** on `http://localhost:{PORT}` |
+
+Normalize in webpack: trailing `/` on `output.publicPath`.
+
+## `turbo.json` — required `env` on `build`
+
+Declare env vars that affect compiled output so cache keys change when they change:
+
+```json
+"build": {
+  "dependsOn": ["^build"],
+  "outputs": ["dist/**"],
+  "env": [
+    "NODE_ENV",
+    "PUBLIC_PATH",
+    "API_BASE_URL",
+    "PORT",
+    "API_PORT",
+    "WEB_PORT"
+  ]
+}
+```
+
+## When `PUBLIC_PATH` changes
+
+```bash
+PUBLIC_PATH='/qa/{root folder name}' npm run build -- --force
+PUBLIC_PATH='/qa/{root folder name}' npm run preview
+```
+
+Or `turbo run build --force` once after changing path or `.env`.
+
+## Webpack `NODE_ENV`
+
+`webpack --mode production` does **not** set `process.env.NODE_ENV` before config loads. Set `NODE_ENV=production` in the build script or root `.env` when using `process.env.NODE_ENV === "production"` in `webpack.config.js`.
+
+## Preview ready URL
+
+Log `http://127.0.0.1:{PORT}{path}` where `path` is `PUBLIC_PATH` (starts with `/`). Do not concatenate a full URL into the port host.
+
+```js
+const previewPath = PUBLIC_PATH.startsWith("/") ? PUBLIC_PATH : `/${PUBLIC_PATH}`
+console.log(`[preview] Ready → proxy http://127.0.0.1:${PORT}${previewPath} | API http://127.0.0.1:${API_PORT}`)
+```
+
+## Reference
+
+Preview scripts: `react-node-structure.md` → **Reference — preview scripts**.

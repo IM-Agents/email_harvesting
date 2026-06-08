@@ -1,0 +1,77 @@
+---
+description: Checklist for Figma tree structure aligned with docs/figma-tree.md — hierarchy, prototypes, and API extraction. Apply when editing Figma organization, creating the design index, or prototype flows.
+globs: "**/docs/figma-tree.md"
+alwaysApply: false
+---
+
+# Figma tree structure — checklist
+
+**Canonical index:** `{monorepo}/docs/figma-tree.md`  
+**When present:** `.cursor/skills/figma-tree-todo/reference/figma-tree-index.md`  
+**Human template (optional):** `.cursor/skills/figma-tree-todo/reference/figma-tree-md-template.md`
+
+Use this rule when **organizing Figma files**, **creating/updating the design index**, **defining navigation/prototype trees**, or **implementing tree extraction code**.
+
+**Page-wise UI implementation:** `.cursor/rules/figma-tree-implementation.mdc` + `.cursor/skills/figma-tree-todo/SKILL.md`.
+
+## Goals
+
+- [ ] **MUST** Treat **`docs/figma-tree.md`** as **source of truth** when the project provides it; **MUST NOT** auto-create or rewrite without user request.
+- [ ] **MUST** Derive **Requirements summary** from the index before coding (`pre-work-requirements.mdc` § 2).
+- [ ] **MUST** Keep hierarchy predictable for **humans** and **programmatic traversal**.
+- [ ] **MUST** Keep **node identity** (file key, node ids) stable for API consumers.
+- [ ] **SHOULD** Separate **production** canvases from **WIP / scratch** content.
+
+## File and page level (doc §1–2)
+
+- [ ] **MUST** Use **one Figma file per product surface** unless an exception is **documented in README**.
+- [ ] **MUST** Name **pages** after **flows or domains** (e.g. `Auth`, `Dashboard`) — not `Page 1`, `Untitled`.
+- [ ] **SHOULD** Put experiments on a **`WIP` / `_scratch`** page; avoid orphan frames on production pages.
+
+## Frame and hierarchy (doc §3)
+
+- [ ] **MUST** Treat each **top-level frame** on a page as a **screen** (or an explicitly labeled **modal/overlay** under that screen).
+- [ ] **MUST** Follow `Page → Screen → sections → components` and cap **primary navigation depth** at roughly **4–5** levels.
+- [ ] **SHOULD** Use **Auto layout** on repeatable rows/columns for stable extraction.
+- [ ] **SHOULD** Prefix **non-export / annotation** layers (`_dev`, `// …`) so code can filter them.
+
+## Naming (doc §4)
+
+- [ ] **MUST** Use **one** screen naming style (**PascalCase** or **Title Case**) per file, consistently.
+- [ ] **MUST** Avoid **duplicate** screen names **on the same page** when both are navigation targets.
+- [ ] **SHOULD** Align names with **routes or states** where helpful (`Dashboard / Empty`, `Runs / Streaming`).
+
+## Components and instances (doc §5)
+
+- [ ] **SHOULD** Use **components**; place **instances** under the correct **screen** frame.
+- [ ] **MUST NOT** Rely on **ungrouped vectors** as navigable nodes unless the extractor explicitly supports them.
+
+## Prototype and flow (doc §6)
+
+- [ ] **MUST** Define a **prototype starting frame** per user-testable flow.
+- [ ] **SHOULD** Connect **primary actions** (CTA, row tap) to a **destination**; no **dangling** hotspots.
+- [ ] **SHOULD** Define **global nav** once per **pattern** / shell; avoid inconsistent rewiring per screen.
+
+## Node identity (doc §7)
+
+- [ ] **MUST** Prefer **rename-in-place** over delete/recreate for screens referenced by URL, DB, or cached tree JSON.
+- [ ] **SHOULD** Plan **migration** when `fileKey` / `nodeId` references must change.
+
+## API and code alignment (doc §8)
+
+- [ ] **MUST** Keep **REST/route shapes**, **validators**, and **tree JSON** in sync when adding or removing consumed screens.
+- [ ] **MUST** Handle **errors explicitly** in extractors (auth, rate limits, missing file) with **logging context** (e.g. request id, file key where safe).
+- [ ] **SHOULD** **Bound** traversal (**max depth**, **max nodes**) in `figmaNavTree`-style code.
+
+## Security (doc §9)
+
+- [ ] **MUST** Keep **Figma tokens** and **private file keys** out of **client** bundles.
+- [ ] **MUST** **Validate** user-supplied **file keys** and **node ids** before Figma API calls.
+
+## Pre-merge quick check (doc §11)
+
+- [ ] **doc** and **this rule** updated together if conventions changed.
+- [ ] Pages and top-level frames reviewed for **naming** and **duplicate** nav targets.
+- [ ] Prototype **entry** and **main paths** are **clickable**; no critical **dangling** links.
+- [ ] Backend **tree** behavior tested for **bounded** size and **explicit** errors.
+- [ ] **Logging** includes traceable context on failure.

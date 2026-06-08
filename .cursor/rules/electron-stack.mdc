@@ -1,0 +1,294 @@
+---
+description: Electron best practices for cross-platform desktop applications
+globs: **/*.js, **/*.ts, src/main/**/*.js, src/preload/**/*.js, src/renderer/**/*.jsx
+---
+
+# Electron Best Practices
+
+## Project Structure
+- Separate main process and renderer process
+- Implement proper folder structure
+- Organize by functional domains
+- Keep preload scripts separate
+- Maintain clear responsibilities
+- Document architecture
+
+## Main Process
+- Handle application lifecycle
+- Manage windows properly
+- Implement proper error handling
+- Use proper logging
+- Implement IPC communication
+- Handle system events
+
+## Renderer Process
+- Use React or Vue for UI
+- Keep UI logic in renderer
+- Implement proper event handling
+- Avoid heavy computations
+- Use IPC for main process calls
+- Implement error boundaries
+
+## Window Management
+- Create windows properly
+- Handle window lifecycle
+- Implement multiple windows
+- Save window state
+- Handle minimize/maximize
+- Manage window focus
+
+## Preload Scripts
+- Use preload for security
+- Implement contextIsolation
+- Expose only necessary APIs
+- Validate all inputs
+- Keep preload minimal
+- Document exposed APIs
+
+## Inter-Process Communication
+- Use ipcMain and ipcRenderer
+- Implement proper channel naming
+- Handle async operations
+- Implement error handling
+- Validate IPC messages
+- Keep IPC communication efficient
+
+## Security Configuration
+- Enable contextIsolation
+- Disable nodeIntegration
+- Disable enableRemoteModule
+- Enable sandbox
+- Implement CSP headers
+- Validate all inputs
+
+## Content Security Policy
+- Implement proper CSP headers
+- Restrict script sources
+- Control style sources
+- Manage image sources
+- Handle external resources
+- Test CSP policies
+
+## File System Access
+- Use IPC for file operations
+- Validate file paths
+- Prevent path traversal
+- Use proper permissions
+- Handle file errors
+- Log file operations
+
+## Native Features
+- Use native dialogs properly
+- Implement native menus
+- Use tray functionality
+- Handle system integration
+- Implement file associations
+- Test on all platforms
+
+## Storage
+- Store user data in proper locations
+- Use secure storage for sensitive data
+- Implement data encryption
+- Handle storage errors
+- Clean up storage properly
+- Document storage structure
+
+## Auto-Updates
+- Implement update mechanism
+- Use code signing
+- Verify signatures
+- Handle update failures
+- Notify users appropriately
+- Test updates thoroughly
+
+## Developer Tools
+- Disable in production
+- Enable in development
+- Implement proper logging
+- Use debugging tools
+- Enable source maps
+- Monitor performance
+
+## Performance
+- Minimize startup time
+- Optimize memory usage
+- Implement lazy loading
+- Use code splitting
+- Cache resources
+- Monitor performance
+
+## Memory Management
+- Clean up resources
+- Remove event listeners
+- Free memory properly
+- Avoid memory leaks
+- Monitor heap size
+- Profile applications
+
+## Process Management
+- Handle main process errors
+- Implement graceful shutdown
+- Handle SIGTERM signals
+- Clean up on exit
+- Save user data
+- Close connections
+
+## Native Modules
+- Use proper native modules
+- Implement proper binding
+- Handle platform differences
+- Test on all platforms
+- Document native code
+- Manage module updates
+
+## Platform-Specific Code
+- Handle Windows differences
+- Handle macOS differences
+- Handle Linux differences
+- Test on all platforms
+- Document platform differences
+- Implement fallbacks
+
+## Code Signing
+- Sign all releases
+- Use proper certificates
+- Implement notarization (macOS)
+- Verify signatures
+- Handle signing errors
+- Document signing process
+
+## Distribution
+- Build for all platforms
+- Create installers
+- Implement proper packaging
+- Test installers
+- Document distribution
+- Handle distribution errors
+
+## Error Handling
+- Implement try-catch blocks
+- Log errors properly
+- Show meaningful errors
+- Implement error recovery
+- Handle async errors
+- Test error scenarios
+
+## Logging
+- Implement structured logging
+- Use appropriate log levels
+- Log important events
+- Avoid sensitive data
+- Rotate log files
+- Monitor logs
+
+## Testing
+- Write unit tests
+- Implement integration tests
+- Test main process
+- Test IPC communication
+- Test native modules
+- Maintain coverage > 70%
+
+## Development Setup
+- Use proper dev tools
+- Implement hot reload
+- Use proper version control
+- Document setup
+- Use consistent environment
+- Test frequently
+
+## Build Process
+- Use Electron Builder
+- Automate builds
+- Create installers
+- Sign code
+- Notarize (macOS)
+- Test builds
+
+## Best Practices
+- Follow Electron best practices
+- Use proper patterns
+- Implement error handling
+- Write maintainable code
+- Document complex logic
+- Review code regularly
+
+## Security Checklist
+- Validate all inputs
+- Use parameterized queries
+- Implement authentication
+- Use encryption
+- Secure credentials
+- Handle secrets properly
+
+## Performance Targets
+- Startup time < 2 seconds
+- Memory usage < 200MB
+- CPU usage (idle) < 5%
+- Smooth animations at 60fps
+- Responsive UI interactions
+- Optimized resource usage
+
+## UI Best Practices
+- Use proper React patterns
+- Implement proper styling
+- Handle responsive layout
+- Test on different resolutions
+- Implement accessibility
+- Follow platform conventions
+
+## Common Pitfalls to Avoid
+- Don't use eval()
+- Avoid eval-like functions
+- Don't hardcode sensitive data
+- Avoid direct node integration
+- Don't skip security
+- Avoid blocking main thread
+
+## Debugging
+- Use DevTools
+- Implement logging
+- Use debugger
+- Profile performance
+- Monitor network
+- Test thoroughly
+
+## Documentation
+- Document architecture
+- Document IPC channels
+- Document APIs
+- Document setup
+- Document deployment
+- Keep docs updated
+
+## Version Management
+- Use semantic versioning
+- Document changes
+- Manage dependencies
+- Track updates
+- Test compatibility
+- Handle migrations
+
+## Accessibility
+- Implement proper keyboard navigation
+- Use semantic HTML
+- Add ARIA attributes
+- Test with screen readers
+- Ensure color contrast
+- Support high contrast mode
+
+## Production Deployment
+- Test thoroughly before release
+- Implement proper monitoring
+- Set up crash reporting
+- Monitor user feedback
+- Handle errors gracefully
+- Plan for updates
+
+## Long-term Maintenance
+- Keep dependencies updated
+- Monitor security vulnerabilities
+- Update Electron regularly
+- Maintain code quality
+- Document changes
+- Plan for deprecation

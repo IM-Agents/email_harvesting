@@ -1,0 +1,380 @@
+---
+description: README & docs first, think what is needed, plan if non-trivial, subagents if parallel tracks, then implement
+alwaysApply: true
+---
+
+# Planning — README & docs first, think, then plan, then subagents
+
+**MUST** follow this flow before the first implementation pass on non-trivial work.
+
+Skip planning/subagents only when user says trivial fix / hotfix / explicit “no plan”.
+
+---
+
+## Order (do not reverse)
+
+```
+0. Read README.md + docs/** FIRST (always)
+1. Think — what is actually needed? (synthesize before writing files)
+2. Plan — master plan/plan-[name].md IF non-trivial
+2b. Feature chunks — plan/features/{feature-slug}.md per feature IF multi-feature work
+3. Subagents — spawn parallel agents IF plan has independent tracks
+4. Research — context7 → web → marketplace/MCP/skills/npm → codebase
+5. Implement — one feature chunk at a time (or subagent per chunk)
+```
+
+**MUST NOT** code, write a plan, or spawn subagents until **README + docs** are read and **§ Think** is done.
+
+---
+
+## 0. Read README & docs first (MUST — always)
+
+**First action** on any task: read project-written sources before inferring anything.
+
+| Priority | Path | Why first |
+|----------|------|-----------|
+| 1 | `README.md` | Commands, app folder names, stack, env, scope |
+| 2 | `docs/**/*.md` | Specs, integrations, env tables, acceptance criteria |
+| 3 | `docs/figma-tree.md` | UI scope (read only; do not auto-create) |
+| 4 | `.env.example`, app env examples | Variable **names and documented values** |
+| 5 | `plan/*.md`, `process.md` | Existing plan / prior decisions |
+| 6 | User brief | Only **after** README/docs — reconcile conflicts |
+
+- **MUST** treat README + docs as **primary** when they mention folder names, env vars, or technologies.
+- **MUST NOT** assume `apps/web` / `apps/api` until README/workspaces confirm or contradict.
+
+---
+
+## 1. Think — what is needed? (MUST before plan or subagents)
+
+After reading README/docs, **stop and synthesize** (in chat or notes — not necessarily a file yet):
+
+| Question | Output |
+|----------|--------|
+| What problem are we solving? | One-sentence goal |
+| What does README/docs already require? | Bullet list from sources |
+| What is missing or ambiguous? | Open questions → ask user or research |
+| What must be built vs already exists? | In scope / out of scope |
+| How many **features** (chunks)? | List feature slugs for `plan/features/*.md` |
+| One agent enough, or split work? | Single track vs subagent candidates |
+
+**Requirements inventory** (bullets): problem, done-when, screens, APIs, data, **env names + values from docs**, technologies.
+
+- **MUST** complete this thinking step before creating `plan/plan-[name].md` or feature chunks.
+- **MUST NOT** skip straight from README scan to coding.
+
+Cross-check: `pre-work-requirements.mdc` § 2.
+
+---
+
+## 2. Plan — master + feature chunks
+
+| Situation | Action |
+|-----------|--------|
+| Trivial fix (one file, obvious change) | No plan file — implement after § Think |
+| Single small feature | `plan/plan-[name].md` only |
+| **Multi-feature** (2+ screens, API modules, phases) | Master `plan/plan-[name].md` **+** one `plan/features/{feature-slug}.md` per feature |
+| Plan already exists in `plan/` | Read and extend — do not duplicate |
+
+**Paths (all under `{monorepo}/plan/`):**
+
+| File | Role |
+|------|------|
+| `plan/plan-[name].md` | **Index** — goal, layout, env, tech, feature list, order, verification |
+| `plan/features/{feature-slug}.md` | **Chunk** — thinking, requirements, steps, verify for **one** feature |
+
+- **MUST NOT** put plans in `docs/`.
+- **MUST** use kebab-case slugs (`auth-login`, `dashboard-api`, `figma-home-page`).
+- **MUST** link each feature file from master § Feature index.
+- Feature template: `.cursor/skills/planning/reference/feature-chunk-template.md`.
+
+### When to create feature-wise `.md` files
+
+| Create `plan/features/*.md` when | Master plan only enough when |
+|----------------------------------|------------------------------|
+| 2+ distinct screens / API areas / migrations | One cohesive change |
+| Different people/agents may own chunks | Single file fix |
+| You want **clear thinking per feature** | User asked for one quick task |
+| Figma tree lists multiple pages | |
+
+Each feature file **MUST** include a **Thinking** section (why this chunk, scope boundary) so work is easy to understand.
+
+### Master plan contents (minimum)
+
+Requirements sources, `{frontend_app}` / `{backend_app}`, tech stack, env vars, research summary, **§ Feature index** (table linking to `plan/features/*.md`), milestone order, subagents, verification.
+
+See § 8 template.
+
+---
+
+## 2b. Feature chunk file (when § 2 applies)
+
+Path: `{monorepo}/plan/features/{feature-slug}.md`
+
+Copy from `feature-chunk-template.md`. Each chunk **MUST** have:
+
+- **Thinking** — why this feature exists, what README/docs say, out-of-scope for this chunk
+- **Requirements** — done-when for this feature only
+- **Implementation steps** — ordered, small enough to execute in one session
+- **Verification** — how to confirm this chunk before starting the next
+
+Implement **one feature chunk at a time**; mark status in the file (`planned` → `in_progress` → `done`).
+
+---
+
+## 3. Subagents — only if needed
+
+After plan exists (or after § Think for medium tasks), decide whether to **split work across subagents**.
+
+| Use subagents when | Do NOT use when |
+|--------------------|-----------------|
+| 2+ **independent** tracks (e.g. API + unrelated docs research) | Steps depend on prior step’s output |
+| Plan milestones can run **in parallel** | Single cohesive file/feature |
+| Large exploration (codebase + docs) while parent plans | User said one agent / small task |
+
+**How to spawn (Cursor Task tool):**
+
+- Document in master plan § Subagents (or per-feature file if one agent per chunk):
+
+```markdown
+## Subagents
+| Agent | subagent_type | Scope | Depends on |
+|-------|---------------|-------|------------|
+| Backend API | generalPurpose | Milestone 2 — {backend_app} routes | Plan approved |
+| Explore routes | explore | Find existing auth patterns | None |
+```
+
+- Launch **parallel** subagents in **one message** when tracks are independent.
+- Parent **MUST** merge results, resolve conflicts, then continue milestones sequentially where needed.
+- Prefer `.cursor/agents/plan-execute.md`, `requirements-architect.md`, or typed subagents (`explore`, `shell`) per task.
+- **Every subagent prompt MUST include** (`AGENTS.md` § 3):
+  - `Follow AGENTS.md § 3. Load: …` with explicit `.cursor/rules/*.mdc` list (baseline + stack + task)
+  - Plan path (`plan/plan-[name].md` and/or `plan/features/{slug}.md`)
+  - Resolved `{frontend_app}` / `{backend_app}` and env names from README/docs
+
+**MUST NOT** spawn subagents before README/docs read and § Think complete.
+
+---
+
+## 4. Project layout — do not assume `apps/web` / `apps/api`
+
+Templates in rules/skills use **`apps/web`** and **`apps/api`** as **examples only**.
+
+| Resolve from | Use for |
+|--------------|---------|
+| `README.md`, `docs/`, root `package.json` `workspaces` | Real frontend / backend folder names |
+| Repo tree (`apps/*`, `app/*`) | Which packages exist |
+
+**Placeholders (use in plans and commands):**
+
+| Placeholder | Meaning |
+|-------------|---------|
+| `{frontend_app}` | Frontend package path — e.g. `apps/web`, `apps/frontend`, `app/frontend` |
+| `{backend_app}` | Backend/API package — e.g. `apps/api`, `app/backend`, `apps/server` |
+| `{monorepo}` | Repository root |
+| `{root folder name}` | `basename` of `{monorepo}` |
+
+- **MUST** set `{frontend_app}` and `{backend_app}` from README/docs/workspace **before** writing the plan.
+- **MUST NOT** rename or move packages to `apps/web` / `apps/api` unless the user or README requires it.
+- **MUST** use resolved paths in plan steps, preview scripts, and migration commands (`npm run db:init --workspace=…`).
+
+Detail: `architecture.mdc` § Project layout.
+
+---
+
+## 5. Environment variables — names **and values** (MUST)
+
+Merge env from **all** sources. When README or `docs/**` document a **value**, use it. When docs give **name only**, record **key only** in plan `.md` — do not invent values in markdown.
+
+### Sources (merge order for planning)
+
+1. Root `{monorepo}/.env.example` and existing `{monorepo}/.env` (if present)
+2. `{backend_app}/.env.example`, `{frontend_app}/.env.example`
+3. **`README.md`** — env blocks, setup tables, `VAR=value` lines
+4. **`docs/**/*.md`** — integration guides, env tables, deployment notes
+5. User brief / ticket (after README/docs)
+6. Platform rules — `DB_*`, `PUBLIC_PATH`, `PORT`, `API_PORT` when docs silent (`env-variables.mdc`, `database-common-stack.mdc`)
+
+### Pickup rules (README & docs)
+
+| In README/docs | Agent action |
+|----------------|--------------|
+| `VAR=value` or table with Value column | **MUST** use that value in plan § Environment and in `.env.example` / local `.env` setup |
+| Name only, **no value** / empty | Plan `.md`: **key only**, Value = `—`; Purpose + prod note; **MUST NOT** guess value in `.md`; `.env.example` at implement with comment |
+| Secret (API key, token) with example like `sk-…` / `your_*` | Use documented placeholder in `.env.example`; in plan `.md` use doc value if given, else key only |
+| Conflicts (README vs docs) | Document in plan; prefer README unless docs are newer/specific |
+
+**MUST NOT** commit real production secrets. **MUST NOT** invent values in plan `.md` when docs are empty. **MUST** commit **non-empty** dev/example values in `.env.example` when README/docs provide them.
+
+### Setup when implementing
+
+When creating or updating env files for a task:
+
+1. Copy documented values from README/docs into `{monorepo}/.env.example` (and app examples if app-scoped).
+2. Ensure local `{monorepo}/.env` has **non-empty** values for every key required to run (from docs + `.env.example` + platform rules).
+3. **MUST NOT** ship empty values for keys the app reads at boot if README/docs or `.env.example` define a value — use the **exact variable name** from those sources, not invented names.
+4. Docker: merge platform inject (`DB_HOST=db`) with project values from docs (`DB_NAME={db_name}`) — `env-variables.mdc` § Database env priority.
+
+| Rule | |
+|------|--|
+| Plan § Environment | Columns: **Variable \| Value \| Purpose \| Project env layer** — **key only** (`Value` = `—`) when docs empty; prod note in Purpose |
+| Env naming | **MUST NOT** invent names — use README, docs, or existing `.env.example` / `env.js` keys only |
+| Secrets in git | Only in `.env` (gitignored); examples use doc placeholders |
+
+### New / additional env — project stack (MUST)
+
+When docs/README introduce vars **not yet** in the project:
+
+1. **Use existing project env** — `@repo/config` + `loadEnv` + `apps/*/config/env.js` (or `{backend_app}/src/config/`) — `env-variables.mdc` § 2c.
+2. Add Joi + `.env.example` (comment if empty) + local `.env` with **non-empty** values for keys required at boot; **keep** all current platform keys (`PORT`, `DB_*`, `PUBLIC_PATH`, …).
+3. App code reads via `env.{NAME}` from `./config` — use **exact** names from README/docs/project env, never invented keys.
+
+Detail: `env-variables.mdc` § 2b, § 2c.
+
+---
+
+## 6. Technology check (MUST)
+
+From requirements + README + `package.json`, list every technology (React, Next.js, Knex, MySQL, Formik, Shopify, etc.).
+
+| Step | Action |
+|------|--------|
+| Map | Each tech → `.cursor/rules/*-stack.mdc` + `.cursor/skills/*/SKILL.md` |
+| Conflict | If requirements say Next.js but rules say webpack-only → note in plan; follow **user/requirements** unless rules are stricter for this repo template |
+| Missing skill | Load matching skill before implementation |
+
+**MUST** implement according to **technologies named in requirements**, not a default stack from examples.
+
+---
+
+## 7. Research + marketplace tools (before plan / subagents execute)
+
+For each requirement point that is **unclear**, **mandatory but unfamiliar**, or **version-sensitive**:
+
+| Order | Source | When |
+|-------|--------|------|
+| 1 | **context7 MCP** | Official docs for libraries/APIs in requirements |
+| 2 | **Web search** | No context7 hit, integration quirks, errors, third-party setup |
+| 3 | **Marketplace & tooling** | See § 7a — **MUST** check before custom-building |
+| 4 | **Codebase** | Existing patterns, `.cursor/skills/`, enabled MCP in `{monorepo}` |
+
+- **MUST** research **before** writing implementation steps when the requirement needs external knowledge.
+- **MUST** record findings in plan § Research notes **and** § Tools & marketplace (master or feature chunk).
+
+### 7a. Marketplace & available tools (MUST during research)
+
+Before inventing a custom solution, **check what already exists**:
+
+| Check | Where | Look for |
+|-------|-------|----------|
+| Cursor **skills** | `.cursor/skills/`, `app/backend/src/assets/cursor/skills/` (template) | Matching workflow (Figma, MySQL, planning, etc.) |
+| Cursor **rules** | `.cursor/rules/*.mdc` | Stack standards already copied to project |
+| Cursor **agents** | `.cursor/agents/*.md` | `plan-execute`, specialists |
+| **MCP servers** | Cursor MCP marketplace, project MCP config (`.cursor/mcp.json`) | Figma, context7, Playwright, GitHub, etc. |
+| **Plugins / extensions** | Cursor marketplace, README “tools” section | Lint, review, design plugins |
+| **npm / package registry** | `package.json`, web search | Libraries (Formik, Yup, Knex, etc.) |
+| **Monorepo packages** | `packages/*`, existing `{frontend_app}` / `{backend_app}` deps | Reuse before new install |
+
+**Decision rule:**
+
+| Found suitable tool | Not found |
+|---------------------|-----------|
+| **MUST** add to plan § Tools & marketplace with name, purpose, install/enable step | Document “build custom” + why no marketplace fit |
+| Prefer **existing MCP/skill/plugin** over one-off scripts | Web search included “{task} cursor mcp”, “{task} npm library” |
+
+**MUST NOT** skip marketplace check when research runs — even if context7 answered the API question.
+
+Example plan rows:
+
+```markdown
+## Tools & marketplace
+| Need | Tool | Source | Action |
+|------|------|--------|--------|
+| Figma → code | Figma MCP + figma-tree-todo skill | Cursor MCP / `.cursor/skills/` | Use existing — load skill before MCP |
+| Form validation | formik + yup | npm | Add to `{frontend_app}` if not in package.json |
+| DB migrations | Knex (already in `{backend_app}`) | codebase | Reuse — no new tool |
+| OAuth | (none in MCP) | web search | Custom impl per docs; note gap |
+```
+
+- If a marketplace tool **should** be added to the project (MCP entry, npm dep, skill copy), put it in the **first milestone** of the relevant feature chunk.
+- **MUST** ask user before adding paid or broad-permission marketplace plugins unless README/docs already allow.
+
+---
+
+## 8. Write plans (when § 2 says plan needed)
+
+### Master: `plan/plan-[name].md`
+
+```markdown
+# Plan: {title}
+
+## Requirements (sources)
+- README: …
+- docs/…: …
+- User: …
+
+## Project layout
+- `{frontend_app}`: …
+- `{backend_app}`: …
+
+## Technology stack
+| Tech | Source | Rule/skill |
+
+## Environment variables
+| Variable | Value | Project env layer | Purpose |
+| STRIPE_SECRET_KEY | — | packages/config | prod: set at deploy — from docs, no dev value |
+| FIGMA_TOKEN | from README | packages/config | Prototype-tree |
+
+<!-- Value = — when docs give name only; never invent values in this .md file -->
+<!-- New keys MUST follow env-variables.mdc § 2c at implement time -->
+
+## Research notes (cross-cutting)
+- …
+
+## Tools & marketplace
+| Need | Tool / MCP / skill / package | Source | Action (use / install / enable) |
+
+## Feature index
+| Order | Slug | File | Depends on | Status |
+|-------|------|------|------------|--------|
+| 1 | auth-login | [features/auth-login.md](features/auth-login.md) | — | planned |
+| 2 | home-page | [features/home-page.md](features/home-page.md) | auth-login | planned |
+
+## Milestones (high level)
+1. Feature `auth-login` → see chunk file
+2. Feature `home-page` → see chunk file
+
+## Subagents (if any)
+| Label | subagent_type | Feature chunk | Rules to load (AGENTS.md § 3) | Parallel? |
+
+## Risks / open questions
+
+## Verification (full task)
+- All feature chunks done + preview / MySQL per pre-work-requirements.mdc § 6
+```
+
+- Single-feature tasks **MAY** omit `plan/features/` and put detail in master plan only.
+- Multi-feature tasks **MUST** create `plan/features/{slug}.md` for each row in § Feature index.
+
+### Feature chunk: `plan/features/{feature-slug}.md`
+
+Use `.cursor/skills/planning/reference/feature-chunk-template.md`.
+
+- Plan **MUST** include every env var and tech mentioned in README/docs/requirements (master or relevant chunk).
+- If § Subagents is non-empty, spawn agents **after** plans are written.
+
+---
+
+## Checklist
+
+- [ ] **README.md** and **docs/** read first
+- [ ] § Think done — features listed as chunks if multi-feature
+- [ ] Master plan `plan/plan-[name].md` **if** non-trivial
+- [ ] Feature chunks `plan/features/{slug}.md` **if** 2+ features (each with **Thinking** section)
+- [ ] Implement one feature chunk at a time; update chunk status
+- [ ] Subagents defined in plan and spawned **if** independent parallel work — **rule list passed in each prompt** (AGENTS.md § 3)
+- [ ] `{frontend_app}` / `{backend_app}` from README — not assumed `apps/web` / `apps/api`
+- [ ] Env: keys from README/docs; plan `.md` **key only** when docs empty (`Value` = `—`); `.env.example` at implement with comment if needed
+- [ ] Research: context7 → web → **marketplace/MCP/skills/npm check** → codebase
+- [ ] Plan § Tools & marketplace lists chosen tools or “build custom” rationale
+- [ ] Coding starts only after think + plan (if needed) + subagent handoff (if needed)

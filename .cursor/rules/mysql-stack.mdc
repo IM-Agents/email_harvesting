@@ -1,0 +1,233 @@
+---
+description: MySQL best practices — schema, env defaults (local/Docker), init/migrate scripts
+globs: **/*.sql, **/*.js, **/*.ts, src/**/*.sql, migrations/**/*.sql, **/knexfile.js, **/.env*
+alwaysApply: true
+---
+
+# MySQL Best Practices
+
+## Default environment (`{monorepo}`)
+
+**MUST** configure MySQL via `DB_*` env vars (never hard-code in source). Shared rules: `./rules/database-common-stack.mdc`, `./rules/env-variables.mdc`.
+
+| Placeholder | Use |
+|-------------|-----|
+| `{db_name}` | Dedicated schema for **this** `{monorepo}` |
+| `{platform_db_name}` | `im_agent_local` — **main IM agent only** |
+| `{root folder name}` | Repo basename — QA path `/qa/{root folder name}` |
+
+**MUST** set `DB_NAME={db_name}` in `{monorepo}/.env` — **never** reuse `{platform_db_name}` for a child QA app on shared MySQL.
+
+**Examples:** `{root folder name}` `login` → `{db_name}` `login_app`; `calculator` → `calculator_app`; main agent → `{platform_db_name}`.
+
+### `.env.example` pattern
+
+```bash
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=wawO=upD8EH!=upH!
+DB_NAME={db_name}
+```
+
+Docker: parent/container sets `DB_HOST=db` — **MUST NOT** let `{monorepo}/.env` `DB_HOST=localhost` override inside the IM platform app container.
+
+### Bootstrap when schema is missing
+
+From `apps/api/` or backend package root (e.g. `{monorepo}/app/backend/`):
+
+```bash
+npm run db:init      # CREATE DATABASE if needed + knex migrate:latest
+npm run db:migrate   # migrations only
+npm run db:status    # check migration state
+```
+
+`scripts/init-db.js` connects without a database, runs `CREATE DATABASE` when `INFORMATION_SCHEMA` shows no schema, then applies `./migrations`.
+
+Docker (IM_coder_agent): `npm run docker:migrate` or exec `npm run db:init` in the `app` container after `docker:dev` is up.
+
+**Preview:** `preview-start.js` **MUST** run `db:migrate` before spawn; `db:init` only if `{db_name}` schema is missing — see `architecture.mdc` § 3.2.
+
+**Corrupt migrations** (“migration directory is corrupt”): wrong `DB_NAME` — reset `{db_name}` schema (dev), then `db:init`; `db:init` alone does not repair `knex_migrations` on the wrong schema (`database-common-stack.mdc`).
+
+**Schema + APIs:** after preview health — `db:status`, verify **all expected tables** in `{db_name}`, then exercise every DB-backed route; fix missing tables/migrations or API errors, re-test — `database-common-stack.mdc`; `architecture.mdc` § 4.3 Step 3b.
+
+**MUST NOT** use string-concatenated SQL for credentials; read `DB_*` via `config` / `knexfile.js` only.
+
+---
+
+## Database Design
+- Use proper normalization (3NF minimum)
+- Implement proper data types
+- Use proper constraints (PK, FK, UNIQUE, CHECK)
+- Design proper schema structure
+- Use proper naming conventions
+- Plan for scalability
+
+## Table Structure
+- Use BIGINT for primary keys (not INT)
+- Implement proper column data types
+- Use NOT NULL constraints where needed
+- Set proper default values
+- Add audit timestamps (created_at, updated_at)
+- Document table purposes
+
+## Naming Conventions
+- Use snake_case for table and column names
+- Use plural form for table names
+- Prefix boolean columns with is/has/should
+- Name foreign keys as parent_table_id format
+- Use idx_ prefix for indexes
+- Use uk_ prefix for unique constraints
+
+## Constraints and Validation
+- Use primary key on every table
+- Implement foreign key constraints properly
+- Use unique constraints for unique data
+- Add check constraints for data validation
+- Use NOT NULL for required fields
+- Document all constraints
+
+## Indexing Strategy
+- Index all foreign keys
+- Index frequently searched columns
+- Create composite indexes for common queries
+- Use proper index naming conventions
+- Avoid over-indexing
+- Monitor index performance
+
+## Query Optimization
+- **MUST** list only needed columns in every `SELECT`—never use `SELECT *`
+- Implement proper pagination with LIMIT
+- Use proper JOIN syntax
+- Avoid functions in WHERE clauses
+- Implement proper subquery patterns
+- Use EXPLAIN to analyze queries
+
+## Data Types Selection
+- Use DECIMAL for monetary values (not FLOAT)
+- Use VARCHAR with proper length limits
+- Use TEXT for large text content
+- Use DATE for dates only
+- Use TIMESTAMP for date and time
+- Choose appropriate integer types
+
+## Transaction Management
+- Use transactions for related operations
+- Implement proper isolation levels
+- Use rollback for error handling
+- Handle deadlocks properly
+- Keep transactions short
+- Document transaction flows
+
+## Database Connections
+- Implement connection pooling
+- Use proper connection limits
+- Handle connection timeouts
+- Implement reconnection logic
+- Monitor active connections
+- Clean up connections properly
+
+## Performance Optimization
+- Analyze query execution plans
+- Optimize slow queries
+- Use proper caching strategies
+- Implement database indexing
+- Monitor query performance
+- Avoid N+1 query problems
+
+## Security
+- Use parameterized queries (prevent SQL injection)
+- Implement proper user permissions
+- Use proper password hashing
+- Encrypt sensitive data
+- Validate all input data
+- Implement access control
+
+## Backup and Recovery
+- Implement automated backups
+- Test backup restoration
+- Use proper backup retention
+- Document recovery procedures
+- Monitor backup success
+- Implement disaster recovery plan
+
+## Replication and Scaling
+- Use proper replication setup
+- Implement master-slave replication
+- Monitor replication lag
+- Handle replication failures
+- Use proper read replicas
+- Implement proper failover
+
+## Monitoring and Logging
+- Enable general query log for debugging
+- Monitor slow query log
+- Implement proper logging
+- Monitor database performance
+- Track resource usage
+- Set up performance alerts
+
+## Schema Changes
+- Use proper migration management
+- Test migrations in development
+- Implement zero-downtime migrations
+- Document all schema changes
+- Use proper versioning
+- Plan for rollbacks
+
+## Data Integrity
+- Use foreign key constraints
+- Validate data constraints
+- Implement proper checksums
+- Monitor data consistency
+- Handle orphaned records
+- Maintain referential integrity
+
+## Best Practices
+- Follow MySQL best practices
+- Use proper SQL syntax
+- Implement error handling
+- Use proper transactions
+- Document database structure
+- Keep performance metrics
+
+## Development Environment
+- Use consistent data types
+- Implement proper seeding
+- Use test data properly
+- Isolate test databases
+- Reset databases between tests
+- Document setup procedures
+
+## Production Considerations
+- Use proper production configurations
+- Implement proper monitoring
+- Set up alerting systems
+- Monitor disk space
+- Plan for growth
+- Document operational procedures
+
+## Code Standards
+- Use proper SQL formatting
+- Add comments for complex queries
+- Use meaningful table/column names
+- Follow consistent naming patterns
+- Document query purposes
+- Implement proper error messages
+
+## Common Pitfalls to Avoid
+- Never use `SELECT *`—specify required columns only
+- Avoid storing sensitive data in plain text
+- Don't ignore foreign key constraints
+- Avoid large transactions
+- Don't skip proper indexing
+- Avoid hard-coded connection strings
+
+## Query Patterns
+- Use proper JOIN syntax
+- Implement proper filtering
+- Use proper grouping
+- Implement proper sorting
+- Use proper aggregation
+- Avoid unnecessary complexity

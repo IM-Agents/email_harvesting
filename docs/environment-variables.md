@@ -13,23 +13,29 @@
 ### Snov.io
 
 ```env
-SNOV_EMAIL=n8n@identixweb.in
-SNOV_PASSWORD=Identixweb@99
+SNOV_EMAIL=
+SNOV_PASSWORD=
 ```
+
+Set real Snov.io credentials in gitignored `{monorepo}/.env` only — not in committed files.
 
 ### Apollo
 
 ```env
-APOLLO_EMAIL=n8n@identixweb.in
-APOLLO_PASSWORD=Identixweb@99
+APOLLO_EMAIL=
+APOLLO_PASSWORD=
 ```
+
+Set real Apollo credentials in gitignored `{monorepo}/.env` only.
 
 ### LinkedIn
 
 ```env
-LINKEDIN_EMAIL=n8n@elookinto.org
-LINKEDIN_PASSWORD=n8n@dev97
+LINKEDIN_EMAIL=
+LINKEDIN_PASSWORD=
 ```
+
+Set real LinkedIn credentials in gitignored `{monorepo}/.env` only.
 
 ### Browser Automation
 
