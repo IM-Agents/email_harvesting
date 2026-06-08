@@ -16,7 +16,7 @@
     "preview:stop": "node scripts/preview-stop.js"
   },
   "devDependencies": {
-    "turbo": "^2.5.4"
+    "turbo": "^2.9.16"
   },
   "dependencies": {
     "@repo/config": "*",
